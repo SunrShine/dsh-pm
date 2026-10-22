@@ -1,18 +1,12 @@
 <h1 align="center">dsh-pm</h1>
 
-<p align="center"><a href="README.md">English</a> · 简体中文</p>
+[English](README.md) · **简体中文**
 
 <p align="center"><b>把 DSH 的工作区与会话状态，整理成以 Org 为唯一真源的「项目 / 任务 / 随手记 / 提案 / 记忆」工作库</b></p>
 
 <p align="center"><b>会话会自动过期，Org 文件不会。</b></p>
 
-<p align="center">
-  <a href="USAGE.zh-CN.md">使用教程</a> ·
-  <a href="docs/screenshots.zh-CN.md">界面截图</a> ·
-  <a href="skill/pm/SKILL.md">skill</a> ·
-  <a href="CHANGELOG.md">变更记录</a> ·
-  <a href="LICENSE">MIT</a>
-</p>
+[使用教程](USAGE.zh-CN.md) · [界面截图](docs/screenshots.zh-CN.md) · [skill](skill/pm/SKILL.md) · [变更记录](CHANGELOG.md) · [MIT](LICENSE)
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT">
@@ -161,7 +155,7 @@ dsh plugin add github:SunrShine/dsh-pm
 
 > **记忆是扁平的（2026-10-18 定为决定）。** 记忆之间只按**状态**（`CANDIDATE → VERIFIED → DEPRECATED`）
 > 与**类型**（事实 / 决策 / 坑）区分，全部由人手工维护；`L1/L2/L3` 分层字段是**保留能力** ——
-> 代码里有、界面不显示、日常不用（见 [`内部记录（未随仓库发布）)）。
+> 代码里有、界面不显示、日常不用（见 [`docs/13`](docs/13-记忆分层：存储、索引与生成流程.md)）。
 > 所以：别把它当死代码删掉，也别在没有新决定的情况下把它接进界面或注入链路。
 
 

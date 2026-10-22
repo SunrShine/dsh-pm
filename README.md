@@ -1,18 +1,12 @@
 <h1 align="center">dsh-pm</h1>
 
-<p align="center">English · <a href="README.zh-CN.md">简体中文</a></p>
+**English** · [简体中文](README.zh-CN.md)
 
 <p align="center"><b>Turn DSH (DeepSeek Harness) workspace and session state into an org-mode work library of projects / tasks / quick notes / proposals / memory — with Org as the single source of truth</b></p>
 
 <p align="center"><b>Sessions expire. Org files do not.</b></p>
 
-<p align="center">
-  <a href="USAGE.md">Usage</a> ·
-  <a href="docs/screenshots.md">Screenshots</a> ·
-  <a href="skill/pm/SKILL.md">skill</a> ·
-  <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="LICENSE">MIT</a>
-</p>
+[Usage](USAGE.md) · [Screenshots](docs/screenshots.md) · [skill](skill/pm/SKILL.md) · [Changelog](CHANGELOG.md) · [MIT](LICENSE)
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT">
@@ -153,6 +147,11 @@ dsh plugin add github:SunrShine/dsh-pm
 | **Memory** | Facts / decisions / gotchas an AI may use as context | `memory/{facts,decisions,gotchas}.org` + `memory-candidates.org` | `CANDIDATE → VERIFIED` (**only a human** can verify) → `DEPRECATED` (history kept) |
 | **Work card** | A read-only snapshot of one DSH session | Not persisted (output of `pm scan` / `ui-cards`) | Says what the cache recorded, never that a session is running (see the [honesty contract](#honesty-contract)) |
 
+> **Memory is flat by decision (2026-10-18).** Memories are separated only by **status** (`CANDIDATE → VERIFIED → DEPRECATED`)
+> and **type** (fact / decision / gotcha), all maintained by hand; the `L1/L2/L3` layer field is a **reserved capability**
+> — present in the code, not shown in the UI, not used day to day ([`docs/13`](docs/13-记忆分层：存储、索引与生成流程.md)).
+> So don't delete it as dead code, and don't wire it into the UI or the injection path without a new decision.
+
 Every **write** goes through the same path (`entities.apply_change`): check the revision first (CAS, so nobody else's edit is overwritten),
 replace the whole file atomically, record an audit entry on the item, and write only once when the same submission is repeated; a revision mismatch returns `exit 3` and writes not a single byte.
 
@@ -200,7 +199,7 @@ role = "explore"
 | `pm inbox` | `list/archive/snooze/merge/note/dismiss/set-status/annotate/edit/history/pin/unpin` | Inbox: triage + append addenda + explicit revision (old value kept) + history + pinning |
 | `pm task` | `list/show/create/transition/check/dag/import-team/execution-config/link-session/unlink-session/handoff` | Tasks, acceptance-criteria ticking, DAG, AI execution config and handoff (**no dispatch**) |
 | `pm proposal` | `list/show/create/approve/reject/revise` | Proposals: only approval creates tasks; revising keeps the id and re-anchors the source revision |
-| `pm memory` | `candidates/list/context/add/verify/deprecate` | Candidate → human verification → context bundle (VERIFIED only) |
+| `pm memory` | `candidates/list/context/add/verify/deprecate/discard` — plus the **reserved** layer commands `scene/extract/condense/distill/stale` | Candidate → human verification → context bundle (VERIFIED only); the reserved five belong to the L1–L3 layer capability (see the note under Core concepts) |
 | `pm project` | `list/create/context/brief get/brief set` | Unified project list, scaffold a directory, project brief (read / explicitly rewrite one section) |
 | `pm workspace` | `list/context` | Workspaces of a project; memory + sessions (observation) of a workspace |
 | `pm mcp` / `pm skill` | `path`, `install` (`--skill NAME`, `--all`, `--all-instances`) | MCP server (stdio) / list or install the skills shipped with the tool |
