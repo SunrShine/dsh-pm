@@ -1,12 +1,20 @@
 <h1 align="center">dsh-pm</h1>
 
+<div align="center">
+
 [English](README.md) · **简体中文**
+
+</div>
 
 <p align="center"><b>把 DSH 的工作区与会话状态，整理成以 Org 为唯一真源的「项目 / 任务 / 随手记 / 提案 / 记忆」工作库</b></p>
 
 <p align="center"><b>会话会自动过期，Org 文件不会。</b></p>
 
+<div align="center">
+
 [使用教程](USAGE.zh-CN.md) · [界面截图](docs/screenshots.zh-CN.md) · [skill](skill/pm/SKILL.md) · [变更记录](CHANGELOG.md) · [MIT](LICENSE)
+
+</div>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT">

@@ -1,12 +1,20 @@
 <h1 align="center">dsh-pm</h1>
 
+<div align="center">
+
 **English** · [简体中文](README.zh-CN.md)
+
+</div>
 
 <p align="center"><b>Turn DSH (DeepSeek Harness) workspace and session state into an org-mode work library of projects / tasks / quick notes / proposals / memory — with Org as the single source of truth</b></p>
 
 <p align="center"><b>Sessions expire. Org files do not.</b></p>
 
+<div align="center">
+
 [Usage](USAGE.md) · [Screenshots](docs/screenshots.md) · [skill](skill/pm/SKILL.md) · [Changelog](CHANGELOG.md) · [MIT](LICENSE)
+
+</div>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT">
