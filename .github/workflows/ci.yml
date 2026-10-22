@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    name: python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # tests/test_subagents.py 会 spawn node 做 zstd 探针（无 node 时该组跳过）
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python 单元测试
+        run: ./bin/test
+
+  frontend:
+    name: frontend selfcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 前端机械守卫
+        run: node frontend_impl/selfcheck.mjs
+      # tests/frontend 是 Node 内置 node --test 的前端单测；没有可跑的用例就跳过（不要提前把 CI 弄红）。
+      # 注意：node --test 传**目录**在 Node 24 会报 "Cannot find module .../tests/frontend" —— 必须用 glob。
+      # 与本地门禁 C37 用**同一条命令**（node --test tests/frontend/*.test.mjs），一处判据、两处执行。
+      # v0.2.1 快照里没有 tests/frontend/，所以当时走了 else 分支、没有暴露这个坑。
+      - name: 前端单元测试（若存在）
+        run: |
+          if ls tests/frontend/*.test.mjs > /dev/null 2>&1; then
+            node --test tests/frontend/*.test.mjs
+          else
+            echo "跳过：没有 tests/frontend/*.test.mjs"
+          fi
+
+# 说明：本 CI **不跑**依赖无头 Chrome 的 CDP 用例（那些脚本引用内部验收记录与本地端口，
+# 不随公开副本发布）。覆盖范围就是上面两个 job。

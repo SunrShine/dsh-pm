@@ -1,0 +1,2368 @@
+{
+  "contractVersion": 1,
+  "generatedFrom": "src/domain-routes.ts",
+  "executorFlags": [
+    "--config",
+    "--json",
+    "--yes"
+  ],
+  "defaultSharedFields": [
+    {
+      "name": "actor",
+      "flag": "--actor",
+      "kind": "enum",
+      "required": false,
+      "values": [
+        "human",
+        "ai",
+        "system"
+      ]
+    },
+    {
+      "name": "reason",
+      "flag": "--reason",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "name": "idempotencyKey",
+      "flag": "--idempotency-key",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "name": "dryRun",
+      "flag": "--dry-run",
+      "kind": "boolean",
+      "required": false
+    }
+  ],
+  "hostOwnedFlags": [
+    {
+      "flag": "--config",
+      "reason": "the host names one configuration file; a request must not repoint the launcher"
+    },
+    {
+      "flag": "--dsh-home",
+      "reason": "the running profile owns the DSH home; a request must not target another instance"
+    },
+    {
+      "flag": "--yes",
+      "reason": "only needed when no configuration file is named, which this service always does"
+    },
+    {
+      "flag": "--json",
+      "reason": "every invocation already asks for JSON"
+    },
+    {
+      "flag": "--help",
+      "reason": "not a request parameter"
+    }
+  ],
+  "unsupported": [
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/submit-review",
+      "reason": "pm task submit-review is not part of the CLI yet (P3 acceptance flow)"
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/accept",
+      "reason": "pm task accept is not part of the CLI yet (P3 acceptance flow)"
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/return",
+      "reason": "pm task return is not part of the CLI yet (P3 acceptance flow)"
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/dispatch",
+      "reason": "this service never dispatches work: execution-config plus handoff is the whole contract, and no endpoint may claim a run started"
+    }
+  ],
+  "unexposedCommands": [
+    {
+      "cliPath": [
+        "api"
+      ],
+      "reason": "the pm-api-v2 envelope query entry: a tooling interface, not something the workbench renders"
+    },
+    {
+      "cliPath": [
+        "init"
+      ],
+      "reason": "library scaffolding: it creates the work-memory skeleton, which an HTTP caller must not do"
+    },
+    {
+      "cliPath": [
+        "log"
+      ],
+      "reason": "session-log extraction for a person or agent; it only prints"
+    },
+    {
+      "cliPath": [
+        "mcp"
+      ],
+      "reason": "the MCP server DSH launches through its own client row; this plugin talks to pm over HTTP instead"
+    },
+    {
+      "cliPath": [
+        "render"
+      ],
+      "reason": "writes generated/ for human maintenance; the workbench reads the live projection instead"
+    },
+    {
+      "cliPath": [
+        "scan"
+      ],
+      "reason": "the read-only scan whose projection the work-card route already serves"
+    },
+    {
+      "cliPath": [
+        "index"
+      ],
+      "reason": "the derived content index (内部记录/11 §A1): maintenance a person or a hook runs, not a workbench action; recall reads what it built"
+    },
+    {
+      "cliPath": [
+        "skill"
+      ],
+      "reason": "skill installation and path maintenance, run by a person or by pm skill install"
+    },
+    {
+      "cliPath": [
+        "summary",
+        "queue"
+      ],
+      "reason": "the summary work queue, read by a person or agent rather than rendered"
+    },
+    {
+      "cliPath": [
+        "summary",
+        "set"
+      ],
+      "reason": "writing a work-card summary: an editorial act the workbench does not perform"
+    },
+    {
+      "cliPath": [
+        "task",
+        "criteria",
+        "init-ids"
+      ],
+      "reason": "planning maintenance: it stamps stable criterion ids onto an existing task"
+    },
+    {
+      "cliPath": [
+        "task",
+        "init-ids"
+      ],
+      "reason": "the same planning maintenance at the task level: it stamps stable criterion ids"
+    },
+    {
+      "cliPath": [
+        "task",
+        "evidence",
+        "rm"
+      ],
+      "reason": "removing evidence is destructive, and the approved scope is CLI-only (2026-10-16 ruling): exposing it needs a proposal, then a human approval, then a card - until then the omission is deliberate"
+    },
+    {
+      "cliPath": [
+        "task",
+        "dag",
+        "set"
+      ],
+      "reason": "dependency-graph maintenance, arranged by a person or agent rather than a workbench view"
+    },
+    {
+      "cliPath": [
+        "task",
+        "import-team"
+      ],
+      "reason": "imports an outside team plan: a planning act, not a workbench action"
+    },
+    {
+      "cliPath": [
+        "task",
+        "evidence",
+        "list"
+      ],
+      "reason": "reading evidence stays on task show --json (2026-10-13 ruling); only the evidence write is routed"
+    },
+    {
+      "cliPath": [
+        "memory",
+        "stale"
+      ],
+      "reason": "read-only, but nothing consumes it: the memory page stages (内部记录/12: P2 browsing/search, P3 history) have no staleness view, so the 2026-10-16 ruling keeps this unexposed - open the route together with the UI change that shows stale L2/L3"
+    },
+    {
+      "cliPath": [
+        "memory",
+        "scene",
+        "show"
+      ],
+      "reason": "the same ruling as memory stale: no memory-page stage shows scenes yet, and opening a read with no consumer fixes a shape before the view exists - open it with the scene view"
+    },
+    {
+      "cliPath": [
+        "memory",
+        "scene",
+        "list"
+      ],
+      "reason": "the list half of the same pending scene view: unexposed until the memory page lists scenes, then opened with it"
+    },
+    {
+      "cliPath": [
+        "memory",
+        "condense"
+      ],
+      "reason": "derives an L2 candidate by running an external LLM (--llm, --allow-network): a generation job a person starts, not an HTTP action, and its output is a candidate the page reviews later"
+    },
+    {
+      "cliPath": [
+        "memory",
+        "extract"
+      ],
+      "reason": "same family: it turns a session into L1 candidates with an external LLM, which is a planning/maintenance run rather than a workbench read or write"
+    },
+    {
+      "cliPath": [
+        "memory",
+        "distill"
+      ],
+      "reason": "same family: it distills L2 into an L3 candidate with an external LLM; exposing an LLM run needs a product decision and its own card"
+    },
+    {
+      "cliPath": [
+        "memory",
+        "scene",
+        "set"
+      ],
+      "reason": "writing a scene is an editorial act (CAS + audit), like removing evidence: exposing it needs a proposal, then a card"
+    },
+    {
+      "cliPath": [
+        "hook",
+        "session-start"
+      ],
+      "reason": "the SessionStart hook the DSH hooks bridge runs with the session context on stdin; its caller is that bridge, not an HTTP request"
+    },
+    {
+      "cliPath": [
+        "hook",
+        "recall"
+      ],
+      "reason": "the UserPromptSubmit hook the same bridge runs per prompt; the workbench reads recall itself through GET /ui-pm/recall"
+    },
+    {
+      "cliPath": [
+        "hook",
+        "install"
+      ],
+      "reason": "it prints a profile fragment for a person to copy; installation guidance is not a workbench action"
+    }
+  ],
+  "fixedRouteCommands": [
+    {
+      "cliPath": [
+        "ui-cards"
+      ],
+      "reason": "served by the fixed work-card route, which is not a table entry"
+    },
+    {
+      "cliPath": [
+        "capture"
+      ],
+      "reason": "served by the fixed quick-note route, which is not a table entry"
+    }
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/ui-pm/inbox",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "status",
+          "kind": "query",
+          "required": false
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "list"
+          ],
+          "argvFlags": [
+            "--status",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/archive",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "archive"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/snooze",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "until",
+          "flag": "--until",
+          "kind": "string",
+          "required": true
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "snooze"
+          ],
+          "argvFlags": [
+            "--until",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/merge",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "into",
+          "flag": "--into",
+          "kind": "string",
+          "required": true
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "merge"
+          ],
+          "argvFlags": [
+            "--into",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/note",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "note"
+          ],
+          "argvFlags": [
+            "--project",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/dismiss",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [],
+      "required": [
+        "reason"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "dismiss"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/inbox/:id",
+      "write": false,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "history"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/annotate",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "text",
+          "flag": "--text",
+          "kind": "string",
+          "required": true
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "annotate"
+          ],
+          "argvFlags": [
+            "--text",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/pin",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "pin"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/unpin",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "unpin"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/edit",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "text",
+          "flag": "--text",
+          "kind": "string",
+          "required": true
+        }
+      ],
+      "required": [
+        "reason"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "edit"
+          ],
+          "argvFlags": [
+            "--text",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/inbox/:id/set-status",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "inbox"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "status",
+          "flag": "--status",
+          "kind": "string",
+          "required": true
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "inbox",
+            "set-status"
+          ],
+          "argvFlags": [
+            "--status",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/workspaces",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "project",
+          "kind": "required-query",
+          "required": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "workspace",
+            "list"
+          ],
+          "argvFlags": [
+            "--project",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/workspaces/context",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "path",
+          "kind": "required-query",
+          "required": true
+        },
+        {
+          "name": "no-global",
+          "flag": "--no-global",
+          "kind": "query",
+          "required": false,
+          "boolean": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "workspace",
+            "context"
+          ],
+          "argvFlags": [
+            "--no-global",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/projects",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "in-library-only",
+          "flag": "--in-library-only",
+          "kind": "query",
+          "required": false,
+          "boolean": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "project",
+            "list"
+          ],
+          "argvFlags": [
+            "--in-library-only",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/projects",
+      "write": true,
+      "revision": "none",
+      "query": [],
+      "body": [
+        {
+          "name": "key",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "flag": "--title",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "path",
+          "flag": "--path",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "workspace",
+          "flag": "--workspace",
+          "kind": "repeat",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "project",
+            "create"
+          ],
+          "argvFlags": [
+            "--title",
+            "--path",
+            "--workspace",
+            "--json"
+          ]
+        }
+      ],
+      "shared": [
+        {
+          "name": "dryRun",
+          "flag": "--dry-run",
+          "kind": "boolean",
+          "required": false
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/projects/:key/brief",
+      "write": false,
+      "revision": "required",
+      "patterns": {
+        "key": "^[A-Za-z0-9._-]+$"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "project",
+            "brief",
+            "get"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/projects/:key/brief",
+      "write": true,
+      "revision": "none",
+      "patterns": {
+        "key": "^[A-Za-z0-9._-]+$"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "section",
+          "flag": "--section",
+          "kind": "enum",
+          "required": true,
+          "values": [
+            "goal",
+            "scope",
+            "nonGoal",
+            "acceptance",
+            "milestones",
+            "risks"
+          ]
+        },
+        {
+          "name": "text",
+          "flag": "--text",
+          "kind": "string",
+          "required": true,
+          "allowEmpty": true
+        },
+        {
+          "name": "expectedDigest",
+          "flag": "--expect-digest",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "actor",
+          "flag": "--actor",
+          "kind": "enum",
+          "required": true,
+          "values": [
+            "human",
+            "ai",
+            "system"
+          ]
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "project",
+            "brief",
+            "set"
+          ],
+          "argvFlags": [
+            "--section",
+            "--text",
+            "--actor",
+            "--expect-digest",
+            "--json"
+          ]
+        }
+      ],
+      "shared": [
+        {
+          "name": "reason",
+          "flag": "--reason",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "dryRun",
+          "flag": "--dry-run",
+          "kind": "boolean",
+          "required": false
+        }
+      ],
+      "notForwarded": [
+        {
+          "flag": "--text-file",
+          "reason": "a request must not read an arbitrary host file into the library; the caller sends the text itself"
+        }
+      ],
+      "unknownFieldHints": {
+        "idempotencyKey": "this command has no idempotency key: it guards duplicates with the digest compare-and-set, so re-sending the same text changes nothing (changed:false) and a file that moved on answers 409",
+        "expectedRevision": "this command compares the whole-file digest, not a revision: send the expectedDigest the read returned"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/projects/:id/context",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "no-global",
+          "flag": "--no-global",
+          "kind": "query",
+          "required": false,
+          "boolean": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "project",
+            "context"
+          ],
+          "argvFlags": [
+            "--no-global",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/tasks",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "project",
+          "kind": "required-query",
+          "required": true
+        },
+        {
+          "name": "status",
+          "kind": "query",
+          "required": false
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "list"
+          ],
+          "argvFlags": [
+            "--project",
+            "--status",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/tasks/:id",
+      "write": false,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [
+        {
+          "name": "project",
+          "kind": "required-query",
+          "required": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "show"
+          ],
+          "argvFlags": [
+            "--project",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks",
+      "write": true,
+      "revision": "none",
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "flag": "--title",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "goal",
+          "flag": "--goal",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "nonGoal",
+          "flag": "--non-goal",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "criterion",
+          "flag": "--criterion",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "fromInbox",
+          "flag": "--from-inbox",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "ai",
+          "flag": "--ai",
+          "kind": "boolean",
+          "required": false
+        },
+        {
+          "name": "assignee",
+          "flag": "--assignee",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "id",
+          "flag": "--id",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "create"
+          ],
+          "argvFlags": [
+            "--project",
+            "--title",
+            "--goal",
+            "--non-goal",
+            "--criterion",
+            "--from-inbox",
+            "--ai",
+            "--assignee",
+            "--id",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/ui-pm/tasks/:id",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "transition"
+          ],
+          "argvFlags": [
+            "--project",
+            "--to",
+            "--json"
+          ],
+          "action": "transition",
+          "body": [
+            {
+              "name": "project",
+              "flag": "--project",
+              "kind": "string",
+              "required": true
+            },
+            {
+              "name": "to",
+              "flag": "--to",
+              "kind": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "cliPath": [
+            "task",
+            "check"
+          ],
+          "argvFlags": [
+            "--project",
+            "--criterion-id",
+            "--index",
+            "--uncheck",
+            "--json"
+          ],
+          "action": "check",
+          "body": [
+            {
+              "name": "project",
+              "flag": "--project",
+              "kind": "string",
+              "required": true
+            },
+            {
+              "name": "criterionId",
+              "flag": "--criterion-id",
+              "kind": "string",
+              "required": false
+            },
+            {
+              "name": "index",
+              "flag": "--index",
+              "kind": "int",
+              "required": false,
+              "deprecated": "prefer criterionId: a stable per-criterion id; a file index shifts when criteria are reordered"
+            },
+            {
+              "name": "uncheck",
+              "flag": "--uncheck",
+              "kind": "boolean",
+              "required": false
+            }
+          ],
+          "exactlyOne": [
+            "criterionId",
+            "index"
+          ],
+          "notForwarded": [
+            {
+              "flag": "--criterion",
+              "reason": "the deprecated number-or-text selector: this service names a criterion by its stable id, so a reordered file cannot retarget a check"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/evidence",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "criterionId",
+          "flag": "--criterion-id",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "flag": "--kind",
+          "kind": "enum",
+          "required": true,
+          "values": [
+            "test",
+            "build",
+            "manual",
+            "artifact",
+            "review",
+            "other"
+          ]
+        },
+        {
+          "name": "result",
+          "flag": "--result",
+          "kind": "enum",
+          "required": true,
+          "values": [
+            "pass",
+            "fail",
+            "info"
+          ]
+        },
+        {
+          "name": "ref",
+          "flag": "--ref",
+          "kind": "string",
+          "required": true,
+          "forbid": {
+            "text": "|",
+            "code": "INVALID_EVIDENCE_REF",
+            "message": "ref must not contain |; put the longer text in note"
+          }
+        },
+        {
+          "name": "note",
+          "flag": "--note",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "required": [
+        "actor"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "evidence",
+            "add"
+          ],
+          "argvFlags": [
+            "--project",
+            "--criterion-id",
+            "--kind",
+            "--result",
+            "--ref",
+            "--note",
+            "--json"
+          ]
+        }
+      ],
+      "unknownFieldHints": {
+        "index": "this command names a criterion by its stable id: send criterionId",
+        "criterion": "this command names a criterion by its stable id: send criterionId"
+      },
+      "notes": [
+        "pm defaults --actor to human; this route requires actor, because an HTTP caller has no terminal context and a wrong audit attribution is worse than a refusal"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/prompt",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "scope",
+          "kind": "required-query",
+          "required": true
+        },
+        {
+          "name": "render",
+          "kind": "query",
+          "required": false,
+          "boolean": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "prompt",
+            "get"
+          ],
+          "argvFlags": [
+            "--scope",
+            "--render",
+            "--json"
+          ]
+        }
+      ],
+      "notes": [
+        "reads projects/proj-<key>/prompt.org through pm prompt get; a missing file is exists:false with revision 0, never a 404",
+        "the answer is {scope, exists, revision, updatedAt, savedBy, blocks[{name, text, include}]}: no injection-side field rides along, and a hand-written file with no :PM_REVISION: reports revision 0",
+        "--render adds a render object beside the payload inside the envelope: the assembled text plus one entry per block with its expression, resolved path, line and byte counts, and the truncation flag (内部记录/25 §4)"
+      ],
+      "flattenData": true
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/prompts",
+      "write": false,
+      "revision": "required",
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "prompt",
+            "list"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ],
+      "notes": [
+        "the answer is pm prompt list with the command data lifted: {onlySaved, count, items[{scope, revision, updatedAt, savedBy, blockCount, path}]}, and every path is relative to the library root",
+        "read-only: it never writes and compares no revision; a project that has recorded nothing simply is not in items",
+        "the singular route stays singular: omitting scope on GET /ui-pm/prompt must never answer a list - a page cannot guess a return type from a missing parameter; if a list mode is ever wanted it needs an explicit discriminator in the payload (e.g. shape:list) rather than an implied one"
+      ],
+      "flattenData": true
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/prompt-exports",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "scope",
+          "kind": "query",
+          "required": false
+        },
+        {
+          "name": "q",
+          "kind": "query",
+          "required": false
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "prompt",
+            "exports",
+            "list"
+          ],
+          "argvFlags": [
+            "--scope",
+            "--q",
+            "--json"
+          ]
+        }
+      ],
+      "notes": [
+        "answers the command data lifted: {records[{id, project, path, name, fmt, bytes, blocks, savedAt, snapshot}]}; scope and q are both optional and only what the caller sends is forwarded",
+        "read-only over a derived store: the records live in .local/prompt-exports.json, never in projects/**",
+        "a corrupt derived store answers 500 (PROMPT_EXPORTS_CORRUPT): that is server state, not the caller request, so it is not dressed up as a 422",
+        "interface provisional: `pm prompt exports` is live; the flag guard keeps this surface aligned with its parser"
+      ],
+      "failureStatuses": {
+        "PROMPT_EXPORTS_CORRUPT": 500
+      },
+      "flattenData": true
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/prompt-exports",
+      "write": true,
+      "revision": "none",
+      "query": [],
+      "body": [
+        {
+          "name": "scope",
+          "flag": "--scope",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "path",
+          "flag": "--path",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "flag": "--name",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "fmt",
+          "flag": "--fmt",
+          "kind": "enum",
+          "required": true,
+          "values": [
+            "md",
+            "txt",
+            "org"
+          ]
+        },
+        {
+          "name": "text",
+          "flag": "--text",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "snapshot",
+          "flag": "--snapshot",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "blocksData",
+          "flag": "--blocks-json",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "idempotencyKey",
+          "flag": "--idempotency-key",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "prompt",
+            "exports",
+            "add"
+          ],
+          "argvFlags": [
+            "--scope",
+            "--path",
+            "--name",
+            "--fmt",
+            "--text",
+            "--snapshot",
+            "--blocks-json",
+            "--idempotency-key",
+            "--json"
+          ]
+        }
+      ],
+      "shared": [],
+      "notForwarded": [
+        {
+          "flag": "--payload-file",
+          "reason": "the route maps the POST body onto the field flags directly; the payload file form reads a host path, which an HTTP request must not name"
+        },
+        {
+          "flag": "--payload-b64",
+          "reason": "the route forwards the body field by field rather than re-encoding it as base64; the payload form exists for a caller that already holds one JSON blob"
+        },
+        {
+          "flag": "--text-file",
+          "reason": "the exported text travels as the request body; reading it back from a host path is a terminal convenience, not something a request may choose"
+        }
+      ],
+      "notes": [
+        "writes one derived record and nothing else: the exported file is the browser user choice, and the service never claims it wrote that path",
+        "idempotencyKey rides straight through: replaying the same export does not append a second record",
+        "PROMPT_EXPORT_BAD_PAYLOAD answers 400 (invalid JSON reached the command); PROMPT_EXPORT_BAD_FMT is unreachable here because the route checks fmt against its enum first, so a bad format is 400 INVALID_BODY",
+        "the body maps 1:1 onto the command flags (scope, path, name, fmt, text, snapshot, blocks-json, idempotency-key); the payload/base64/file forms are declared omissions"
+      ],
+      "failureStatuses": {
+        "PROMPT_EXPORT_BAD_PAYLOAD": 400,
+        "PROMPT_EXPORTS_CORRUPT": 500
+      },
+      "flattenData": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/ui-pm/prompt-exports/:id",
+      "write": true,
+      "revision": "none",
+      "patterns": {
+        "id": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "prompt",
+            "exports",
+            "delete"
+          ],
+          "argvFlags": [
+            "--id",
+            "--json"
+          ]
+        }
+      ],
+      "shared": [],
+      "notes": [
+        "deletes one derived record only: the exported file and prompt.org stay untouched",
+        "a missing record answers 404 (PROMPT_EXPORT_NOT_FOUND) rather than a generic 422; the record store is derived, so the exported file may still exist",
+        "answers the command data lifted: {deleted: 1}",
+        "interface provisional: `pm prompt exports delete` is live; the flag guard keeps this surface aligned with its parser"
+      ],
+      "failureStatuses": {
+        "PROMPT_EXPORT_NOT_FOUND": 404,
+        "PROMPT_EXPORTS_CORRUPT": 500
+      },
+      "flattenData": true
+    },
+    {
+      "method": "PUT",
+      "path": "/ui-pm/prompt",
+      "write": true,
+      "revision": "required",
+      "query": [],
+      "body": [
+        {
+          "name": "scope",
+          "flag": "--scope",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "blocks",
+          "flag": "--block-json",
+          "kind": "json-repeat",
+          "required": true
+        }
+      ],
+      "required": [
+        "actor"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "prompt",
+            "set"
+          ],
+          "argvFlags": [
+            "--scope",
+            "--block-json",
+            "--json"
+          ]
+        }
+      ],
+      "shared": [
+        {
+          "name": "actor",
+          "flag": "--actor",
+          "kind": "enum",
+          "required": false,
+          "values": [
+            "human",
+            "ai"
+          ]
+        },
+        {
+          "name": "reason",
+          "flag": "--reason",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "idempotencyKey",
+          "flag": "--idempotency-key",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "dryRun",
+          "flag": "--dry-run",
+          "kind": "boolean",
+          "required": false
+        }
+      ],
+      "notForwarded": [
+        {
+          "flag": "--blocks-json",
+          "reason": "the route sends the repeatable --block-json so argv order encodes block order; the whole-array form exists for a caller that already built one JSON value"
+        },
+        {
+          "flag": "--file",
+          "reason": "reading an org file (or stdin) is the terminal path: a request must not name an arbitrary host path, and the executor has no stdin channel"
+        }
+      ],
+      "notes": [
+        "never rewrites an existing prompt.org: expectedRevision is required, 0 means create-only, and a conflict is pm exit 3 -> 409 whose payload carries error.currentRevision",
+        "blocks travel as repeated --block-json elements in array order (pm also accepts --file/- and a whole-array --blocks-json, which a route cannot use), so pm assembles the org file and gives each block its :ID: drawer - this half never builds org text",
+        "refusals the caller can meet: RESERVED_BLOCK_NAME (block name prompt-meta is reserved) -> 400; AI_CANNOT_EDIT (an existing prompt.org edited as actor=ai) -> 422; BLOCK_DELETE_UNSUPPORTED (the request drops a block) -> 422",
+        "an idempotencyKey belongs to one intended change: replaying it answers as a replay - 200 with changed:0 and the revision where it was - and a key that was already used on that file (even by an earlier attempt) answers the next call the same way, so a page must mint a fresh key per save",
+        "a successful save advances the file revision and the block revisions together; a live acceptance reads create revision 1, a stale revision 409 with error.currentRevision, an edit at revision 2, a keyed save at revision 3 and its replay unchanged at 3, and a reserved block name refused as 400",
+        "the payload is the command data lifted to one level (flattenData): {scope, file, revision, changed, idempotent, dryRun} for a write and the six documented fields for the read, never data.data",
+        "pm answers exit 2 REVISION_REQUIRED without a revision, which this route never provokes: the field is required, so body validation refuses first",
+        "actor is required and accepts only {human, ai}, deliberately with no default: a route that filled in human would let automation be recorded as a person editing a human file, which is the red line bypassed (fail-open); refusing a body without it is fail-closed. The command recording its own default as ai points the same way, and the page sends human explicitly",
+        "note 2026-10-18 (mechanism explained, appended): the one file-revision stall observed (run C) is a pre-fix shape - the client key went straight to the meta write, so a leftover replay record for that key skipped the meta bump while the block write with its derived key still landed.",
+        "that stall needs a stale leftover key, so this revision does not reproduce it and that is expected: the same key answers a replay (nothing written, changed:0), a fresh key changes content and the revision advances by one; pm pins the half-write with tests/test_prompt.py::test_same_key_different_content_never_half_writes (reverting the derived meta key turns that test red). The two raw logs match too: run C shows changed:1 with idempotent:true while the revision stayed 1, run I uses a per-run key, reads changed:0 and then revision 2."
+      ],
+      "failureStatuses": {
+        "RESERVED_BLOCK_NAME": 400
+      },
+      "flattenData": true
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/tasks/:id/execution-config",
+      "write": false,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "execution-config",
+            "get"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/execution-config",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "workspace",
+          "flag": "--workspace",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "instance",
+          "flag": "--instance",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "memory",
+          "flag": "--memory",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "session",
+          "flag": "--session",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "note",
+          "flag": "--note",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "execution-config",
+            "set"
+          ],
+          "argvFlags": [
+            "--workspace",
+            "--instance",
+            "--project",
+            "--memory",
+            "--session",
+            "--note",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/link-session",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "session",
+          "flag": "--session",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "instance",
+          "flag": "--instance",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "link-session"
+          ],
+          "argvFlags": [
+            "--session",
+            "--instance",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/unlink-session",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [],
+      "required": [
+        "reason"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "unlink-session"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/tasks/:id/handoff",
+      "write": false,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "handoff"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/proposals",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "status",
+          "kind": "query",
+          "required": false
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "proposal",
+            "list"
+          ],
+          "argvFlags": [
+            "--status",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/proposals/:id",
+      "write": false,
+      "revision": "required",
+      "ids": {
+        "id": "proposal"
+      },
+      "query": [],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "proposal",
+            "show"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/proposals",
+      "write": true,
+      "revision": "optional",
+      "query": [],
+      "body": [
+        {
+          "name": "sourceInbox",
+          "flag": "--source-inbox",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "change",
+          "flag": "--change",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "criterion",
+          "flag": "--criterion",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "risk",
+          "flag": "--risk",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "action",
+          "flag": "--action",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "title",
+          "flag": "--title",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "planRevision",
+          "flag": "--plan-revision",
+          "kind": "int",
+          "required": false
+        },
+        {
+          "name": "createdBy",
+          "flag": "--created-by",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "allowDuplicate",
+          "flag": "--allow-duplicate",
+          "kind": "boolean",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "proposal",
+            "create"
+          ],
+          "argvFlags": [
+            "--source-inbox",
+            "--change",
+            "--criterion",
+            "--risk",
+            "--action",
+            "--title",
+            "--project",
+            "--plan-revision",
+            "--created-by",
+            "--allow-duplicate",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/proposals/:id/revise",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "proposal"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "title",
+          "flag": "--title",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "changes",
+          "flag": "--change",
+          "kind": "json-repeat",
+          "required": false
+        },
+        {
+          "name": "changeOp",
+          "flag": "--change-op",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "changeTitle",
+          "flag": "--change-title",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "criterion",
+          "flag": "--criterion",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "risks",
+          "flag": "--risk",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "actions",
+          "flag": "--action",
+          "kind": "repeat",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "proposal",
+            "revise"
+          ],
+          "argvFlags": [
+            "--title",
+            "--change",
+            "--change-op",
+            "--change-title",
+            "--criterion",
+            "--risk",
+            "--action",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/proposals/:id/approve",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "proposal"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "allowStale",
+          "flag": "--allow-stale",
+          "kind": "boolean",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "proposal",
+            "approve"
+          ],
+          "argvFlags": [
+            "--project",
+            "--allow-stale",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/proposals/:id/reject",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "proposal"
+      },
+      "query": [],
+      "body": [],
+      "required": [
+        "reason"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "proposal",
+            "reject"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/memory",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "type",
+          "kind": "query",
+          "required": false
+        },
+        {
+          "name": "scope",
+          "kind": "query",
+          "required": false
+        },
+        {
+          "name": "status",
+          "kind": "query",
+          "required": false
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "memory",
+            "list"
+          ],
+          "argvFlags": [
+            "--type",
+            "--scope",
+            "--status",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/memory/candidates",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "status",
+          "kind": "query",
+          "required": false
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "memory",
+            "candidates"
+          ],
+          "argvFlags": [
+            "--status",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/memory/context",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "scope",
+          "kind": "required-query",
+          "required": true
+        },
+        {
+          "name": "task",
+          "kind": "query",
+          "required": false
+        },
+        {
+          "name": "no-global",
+          "flag": "--no-global",
+          "kind": "query",
+          "required": false,
+          "boolean": true
+        },
+        {
+          "name": "allow-cross-scope",
+          "flag": "--allow-cross-scope",
+          "kind": "query",
+          "required": false,
+          "boolean": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "memory",
+            "context"
+          ],
+          "argvFlags": [
+            "--scope",
+            "--task",
+            "--no-global",
+            "--allow-cross-scope",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui-pm/recall",
+      "write": false,
+      "revision": "required",
+      "query": [
+        {
+          "name": "q",
+          "kind": "required-query",
+          "required": true
+        },
+        {
+          "name": "scope",
+          "kind": "query",
+          "required": false
+        },
+        {
+          "name": "type",
+          "kind": "query",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "kind": "query",
+          "required": false
+        },
+        {
+          "name": "any",
+          "kind": "query",
+          "required": false,
+          "boolean": true
+        }
+      ],
+      "body": [],
+      "commands": [
+        {
+          "cliPath": [
+            "recall"
+          ],
+          "argvFlags": [
+            "--query",
+            "--scope",
+            "--type",
+            "--limit",
+            "--any",
+            "--json"
+          ]
+        }
+      ],
+      "notForwarded": [
+        {
+          "flag": "--include-candidate",
+          "reason": "outside the P1 read (q/scope/type/limit): widening a search to unconfirmed candidates is a product decision, so the omission is declared until a filter asks for it"
+        },
+        {
+          "flag": "--include-deprecated",
+          "reason": "outside the P1 read (q/scope/type/limit): a default search returns live memories, and a history filter can expose this later"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/memory-candidates",
+      "write": true,
+      "revision": "none",
+      "query": [],
+      "body": [
+        {
+          "name": "text",
+          "flag": "--text",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "scope",
+          "flag": "--scope",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "type",
+          "flag": "--type",
+          "kind": "enum",
+          "required": true,
+          "values": [
+            "fact",
+            "decision",
+            "gotcha"
+          ]
+        },
+        {
+          "name": "sources",
+          "flag": "--sources",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "topic",
+          "flag": "--topic",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "taskId",
+          "flag": "--task-id",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "createdBy",
+          "flag": "--created-by",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "supersedes",
+          "flag": "--supersedes",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "memory",
+            "add"
+          ],
+          "argvFlags": [
+            "--text",
+            "--scope",
+            "--type",
+            "--sources",
+            "--topic",
+            "--task-id",
+            "--created-by",
+            "--supersedes",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/memory-candidates/:id/verify",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "memory"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "sources",
+          "flag": "--sources",
+          "kind": "repeat",
+          "required": false
+        },
+        {
+          "name": "supersedes",
+          "flag": "--supersedes",
+          "kind": "string",
+          "required": false
+        },
+        {
+          "name": "conflictWith",
+          "flag": "--conflict-with",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "memory",
+            "verify"
+          ],
+          "argvFlags": [
+            "--sources",
+            "--supersedes",
+            "--conflict-with",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/memory/:id/discard",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "memory"
+      },
+      "query": [],
+      "body": [],
+      "required": [
+        "reason"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "memory",
+            "discard"
+          ],
+          "argvFlags": [
+            "--json"
+          ]
+        }
+      ],
+      "notes": [
+        "error mapping: NOT_A_CANDIDATE -> 422 (a VERIFIED memory is deprecated, not discarded), REVISION_CONFLICT -> 409",
+        "REASON_REQUIRED -> 400 stays from the command contract, but this route normally never sees it: the body is validated first, so a missing reason answers 400 INVALID_REQUEST and an empty one answers 400 INVALID_BODY, and the command is not run at all",
+        "discarding an already DEPRECATED candidate is idempotent: it answers 200 with changed:false and discarded:false"
+      ],
+      "failureStatuses": {
+        "REASON_REQUIRED": 400,
+        "NOT_A_CANDIDATE": 422
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/memory/:id/deprecate",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "memory"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "supersededBy",
+          "flag": "--superseded-by",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "required": [
+        "reason"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "memory",
+            "deprecate"
+          ],
+          "argvFlags": [
+            "--superseded-by",
+            "--json"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsh-pm"
+version = "0.3.1"
+description = "DSH → Org 工作记忆：把 DSH 的工作区 / 会话状态投影成项目 / 任务 / 随手记 / 提案 / 记忆"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["dsh", "org-mode", "work-memory", "task-management"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Office/Business :: Scheduling",
+]
+dependencies = []          # 零运行时依赖：只用标准库
+# 发布形态：pipx install git+https://github.com/SunrShine/dsh-pm
+# 与 DSH 插件的关系见 README（插件走 GitHub，不声明 @deepseek-ai/dsh* peer）
+
+[project.urls]
+Repository = "https://github.com/SunrShine/dsh-pm"
+
+[project.scripts]
+pm = "pm.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# 包数据：skill 源目录的安装后副本（`pm skill path/install` 在 pipx 安装下也要能用）。
+# frontend_impl/ 是插件侧资源，刻意**不**打进 Python 包。
+[tool.setuptools.package-data]
+pm = ["_skill/**/*.md"]

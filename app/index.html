@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN" data-i18n-shell="1">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>PM Workbench · Org Memory</title>
+<!-- 浏览器默认会请求 /favicon.ico（页面原本未声明图标）⇒ 用 data: 空图标消灭该请求；
+     目的：verifier 248 的 B 栏「资源加载失败 0」在去掉点名白名单后也能 PASS。 -->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css">
+  <!-- task-265：初始提示词页样式表 —— 由 scripts/build_prompt_page_css.py 从设计示例机械生成（勿手改）-->
+  <link rel="stylesheet" href="pm-prompt.page.css">
+  <!-- task-265 对齐：记忆与决策页样式表 —— 由 scripts/build_memory_page_css.py 从设计示例（内部记录/23）机械生成（勿手改）-->
+  <link rel="stylesheet" href="pm-memory.page.css">
+<script>
+/* 主题初始化（防闪烁）：在任何渲染前算出 data-theme。
+   内嵌 DSH 时读宿主**已解析**的主题（window.parent.body[data-ds-dark-theme]，只读）；
+   独立打开时读 prefers-color-scheme；用户手动选择（localStorage）优先。
+   只写本 iframe 文档的 <html>，不改宿主页面主题。 */
+(function () {
+  try {
+    var saved = localStorage.getItem('pm-theme');
+    var mode = (saved === 'light' || saved === 'dark') ? saved : 'system';
+    var theme = mode;
+    if (mode === 'system') {
+      var dark = null;
+      try {
+        var pd = (window.parent && window.parent !== window) ? window.parent.document : null;
+        if (pd && pd.documentElement) {
+          var supported = typeof pd.documentElement.dataset.dsThemeSource === 'string'
+            || (pd.body && pd.body.hasAttribute('data-ds-dark-theme'));
+          if (supported) dark = !!(pd.body && pd.body.hasAttribute('data-ds-dark-theme'));
+        }
+      } catch (e) { /* 跨源：退回系统偏好 */ }
+      if (dark === null) dark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      theme = dark ? 'dark' : 'light';
+    }
+    var el = document.documentElement;
+    el.setAttribute('data-theme', theme);
+    el.setAttribute('data-theme-mode', mode);
+  } catch (e) { /* localStorage 不可用时退回 CSS 的 light dark 兜底 */ }
+})();
+</script>
+</head>
+<body>
+<a class="skip-link" href="#content" data-i18n="shell.skip">Skip to main content</a>
+
+<div class="shell" id="shell">
+
+  <!-- 第一栏：Global navigation -->
+  <aside class="sidebar" id="sidebar" aria-label="Global navigation" data-i18n-aria="sidebar.label">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">PM</span><span class="brand-text" data-i18n="brand.title">PM Workbench</span>
+      <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="true"
+              aria-label="Collapse sidebar (icons only when collapsed)" data-i18n-aria="sidebar.collapseAria" title="Collapse sidebar (icons only)" data-i18n-title="sidebar.collapseTitle">&#8676;</button>
+    </div>
+    <div class="nav-label" data-i18n="nav.label">Work management</div>
+    <nav id="nav" aria-label="Main navigation" data-i18n-aria="nav.aria">
+      <button type="button" data-view="board" class="active" aria-label="Workbench" data-i18n-aria="nav.board" title="Workbench" data-i18n-title="nav.board"><span aria-hidden="true">&#8962;</span><span class="nav-text" data-i18n="nav.board">Workbench</span></button>
+      <button type="button" data-view="projects" aria-label="Projects" data-i18n-aria="nav.projects" title="Projects" data-i18n-title="nav.projects"><span aria-hidden="true">&#9638;</span><span class="nav-text" data-i18n="nav.projects">Projects</span> <span class="count" id="nav-projects"></span></button>
+      <button type="button" data-view="inbox" aria-label="Inbox" data-i18n-aria="nav.inbox" title="Inbox" data-i18n-title="nav.inbox"><span aria-hidden="true">&#10022;</span><span class="nav-text" data-i18n="nav.inbox">Inbox</span> <span class="count" id="nav-inbox"></span></button>
+      <button type="button" data-view="review" aria-label="Review" data-i18n-aria="nav.review" title="Review" data-i18n-title="nav.review"><span aria-hidden="true">&#10003;</span><span class="nav-text" data-i18n="nav.review">Review</span></button>
+      <button type="button" data-view="memory" aria-label="Memory & decisions" data-i18n-aria="nav.memory" title="Memory & decisions" data-i18n-title="nav.memory"><span aria-hidden="true">&#9671;</span><span class="nav-text" data-i18n="nav.memory">Memory & decisions</span></button>
+      <!-- task-265：初始系统提示词页（内部记录/25；h1「初始系统提示词」） -->
+      <button type="button" data-view="prompt" aria-label="Initial system prompt" data-i18n-aria="nav.prompt" title="Initial system prompt" data-i18n-title="nav.prompt"><span aria-hidden="true">&#9998;</span><span class="nav-text" data-i18n="nav.prompt">Initial system prompt</span></button>
+    </nav>
+    <div class="aside-note">
+      <strong data-i18n="aside.head">The files in the library are the real data</strong><br>
+      <span data-i18n="aside.body">These numbers come from the Org files in the library (and from DSH read-only records). Whether a session is running right now cannot be seen in a snapshot:
+       so this page only says what the record shows, never that it is running right now.</span>
+    </div>
+  </aside>
+
+  <!-- 第二栏：页面主Content -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <!-- 标题区左侧：Back = 来路（应用内历史栈，没有上一页时回落到自然父级）；
+             显式链接 = 知道要去哪。两者并存，语义不同。 -->
+        <div class="crumb" role="navigation" aria-label="Back and parent" data-i18n-aria="topbar.backAria">
+          <button class="crumb-btn back" type="button" id="back-btn" hidden>&#8592; <span data-i18n="topbar.back">Back</span></button>
+          <span class="crumb-sep" id="crumb-sep" hidden>/</span>
+          <button class="crumb-btn" type="button" id="parent-link" hidden></button>
+        </div>
+        <h1 id="page-title">Workbench</h1>
+        <p class="subtle" id="page-sub"></p>
+        <!-- 用户 2026-10-21：状态行放在**标题区**（原在按钮行末尾，中英文案长度不同会挤动/换行按钮位置 ✗）-->
+        <span class="sync" id="sync" role="status" aria-live="polite" data-i18n="sync.loading">Not loaded</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn" type="button" id="refresh">&#8635; <span data-i18n="topbar.refresh">Refresh</span></button>
+        <button class="btn" type="button" id="detail-toggle" aria-expanded="true" aria-controls="detail" data-i18n="topbar.detailToggleHide">Hide details</button>
+        <button class="btn" type="button" id="theme-toggle" aria-label="Theme: follow system" data-i18n-aria="topbar.themeFallback" data-i18n="topbar.themeFallback">Theme: follow system</button>
+        <button class="btn" type="button" id="lang-toggle" title="Switch UI language (shell only; long prose comes later)" data-i18n-title="topbar.langSwitchTitle" data-i18n="topbar.langSwitch">Chinese</button>
+      </div>
+    </header>
+    <div class="content" id="content"></div>
+  </main>
+
+  <!-- 拖拽手柄：pointer capture 实时改宽，双击复位；角色是可聚焦的 window splitter -->
+  <div class="detail-resizer" id="detail-resizer" role="separator" aria-orientation="vertical"
+       aria-label="Resize the detail pane: arrow keys adjust, Home/End go to min/max, double-click resets" data-i18n-aria="detail.resizer"
+       aria-valuemin="320" aria-valuemax="720" aria-valuenow="380" tabindex="0"></div>
+
+  <!-- 第三栏：当前项操作 / Details（可收起；900px 以下移到下方） -->
+  <aside class="detailbar" id="detail" aria-label="Actions and details for the current item" data-i18n-aria="detail.pane">
+    <div class="detail-head">
+      <h2 id="detail-title" data-i18n="detail.title">Details</h2>
+      <button class="icon-btn" type="button" id="detail-close" aria-label="Collapse detail pane" data-i18n-aria="detail.close">&times;</button>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+  </aside>
+
+</div>
+
+<!-- 快速记录：只追加 inbox.org，不触发任何 AI 执行 -->
+<dialog id="capture-dialog" aria-labelledby="capture-title">
+  <form method="dialog" class="dialog-form" id="capture-form">
+    <div class="dialog-head">
+      <div>
+        <h2 id="capture-title" data-i18n="capture.title">New note</h2>
+        <p class="subtle" data-i18n="capture.hint">Appends one line to inbox.org; it creates no task and dispatches no AI.</p>
+      </div>
+      <button type="button" class="icon-btn" data-dialog-close="capture-dialog" aria-label="Close" data-i18n-aria="capture.closeAria">&times;</button>
+    </div>
+    <div class="dialog-body">
+      <label class="field">
+        <span data-i18n="capture.content">Content</span>
+        <textarea autocomplete="off" id="capture-text" rows="4" placeholder="Jot it down; no full fields needed." data-i18n-placeholder="capture.placeholder" required></textarea>
+      </label>
+      <div class="notice" id="capture-impact">
+        <span data-i18n="capture.willDoPre">This will append one list item to</span> <code>inbox.org</code><span data-i18n="capture.willDoPost"> (the backend returns ID / revision / position).</span><br>
+        <span data-i18n="capture.wontDo">It will not create tasks, dispatch AI, or modify existing records.</span>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <span class="dialog-status" id="capture-status" role="status" aria-live="polite"></span>
+      <button type="button" class="btn" data-dialog-close="capture-dialog" value="cancel" data-i18n="dialog.cancel">Cancel</button>
+      <button type="submit" class="btn primary" id="capture-submit" value="ok" data-i18n="capture.submit">Capture</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 宿主 ui-pm 只托管 index.html / app.css / app.js 三个文件（src/index.ts APP_FILES 白名单），
+     所以主题逻辑内联在 app.js 顶部，不额外引文件。 -->
+<!-- AI 执行准备向导（六步）：只保存执行配置 / 复制 handoff，绝不派发。
+     契约：内部记录（未随仓库发布） §0 §3；dispatchStatus 只有 NOT_READY / HANDOFF_READY。 -->
+<dialog id="exec-dialog" aria-labelledby="exec-dialog-title">
+  <div class="dialog-form exec-form">
+    <div class="dialog-head">
+      <div>
+        <h2 id="exec-dialog-title" data-i18n="exec.title">Set up AI execution</h2>
+        <p class="subtle" id="exec-sub"></p>
+      </div>
+      <button class="icon-btn" id="exec-close" type="button" aria-label="Close" data-i18n-aria="exec.closeAria">&times;</button>
+    </div>
+    <div class="dialog-body" id="exec-body"></div>
+    <div class="dialog-foot">
+      <span class="dialog-status" id="exec-status" role="status" aria-live="polite"></span>
+      <button class="btn" type="button" id="exec-discard" hidden data-i18n="exec.discard">Discard draft</button>
+      <button class="btn" type="button" id="exec-prev" hidden data-i18n="exec.prev">← Previous</button>
+      <button class="btn" type="button" id="exec-next" data-i18n="exec.next">Next →</button>
+      <button class="btn primary" type="button" id="exec-save" hidden data-i18n="exec.save">Save execution config</button>
+      <button class="btn" type="button" id="exec-copy" hidden data-i18n="exec.copy">Copy handoff</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- 从随手记生成提案：① AI 路径给一段可粘贴进 DSH 会话的指令（浏览器不代调 LLM）
+     ② 人工路径直接 POST /ui-pm/proposals（created-by=human） -->
+<dialog id="proposal-dialog" aria-labelledby="proposal-dialog-title">
+  <form method="dialog" class="dialog-form" id="proposal-form">
+    <div class="dialog-head">
+      <div>
+        <h2 id="proposal-dialog-title" data-i18n="proposal.title">Turn this note into a task proposal</h2>
+        <p class="subtle" data-i18n="proposal.subtitle">A proposal is not a task: a real task is created only after approval, and nothing is dispatched automatically.</p>
+      </div>
+      <button type="button" class="icon-btn" data-dialog-close="proposal-dialog" aria-label="Close" data-i18n-aria="proposal.closeAria">&times;</button>
+    </div>
+    <div class="dialog-body">
+      <div class="src" id="proposal-source"></div>
+
+      <div class="choice">
+        <label class="choice-head"><input autocomplete="off" type="radio" name="proposal-mode" value="ai" checked>
+          <b data-i18n="proposal.modeAi">Let AI draft a proposal</b><span class="chip dashed">AI</span></label>
+        <div id="proposal-ai">
+          <p class="hint" data-i18n="proposal.aiHint">The browser cannot call an LLM for you: paste the text below into your DSH session. The instruction carries the entry ID, the original text and the project hint,
+             and asks for proposals only - no real tasks, no dispatch.</p>
+          <label class="sr-only" for="ai-instruction" data-i18n="proposal.aiLabel">Instruction for the AI</label>
+          <textarea autocomplete="off" id="ai-instruction" rows="9" readonly></textarea>
+          <div class="op-row">
+            <button type="button" class="btn small" id="ai-copy" data-i18n="proposal.aiCopy">Copy instruction</button>
+            <span class="hint" id="ai-copy-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="choice">
+        <label class="choice-head"><input autocomplete="off" type="radio" name="proposal-mode" value="manual">
+          <b data-i18n="proposal.modeManual">I will write it myself</b><span class="chip dashed" data-i18n="proposal.chipManual">Manual</span></label>
+        <div id="proposal-manual" hidden>
+          <label class="field"><span data-i18n="proposal.projectKey">Project key (optional)</span>
+            <div id="proposal-project-wrap"><input autocomplete="off" type="text" id="proposal-project" placeholder="e.g. demo" data-i18n-placeholder="proposal.projectPlaceholder"></div></label>
+          <label class="field"><span data-i18n="proposal.titleLabel">Title (optional)</span>
+            <input autocomplete="off" type="text" id="proposal-title-input" placeholder="One line summarising the change" data-i18n-placeholder="proposal.titlePlaceholder"></label>
+          <label class="field"><span data-i18n="chg.opLabel">Operation</span>
+            <select id="proposal-change-op">
+              <option value="新增" selected data-i18n="chg.opAdd">Add</option>
+              <option value="修改" disabled data-i18n="chg.opModify">Change</option>
+              <option value="删除" disabled data-i18n="chg.opDelete">Delete</option>
+            </select>
+            <p class="hint" data-i18n="chg.opNoteVisible">“Change / Delete” cannot be selected in v1 — the reason is written in the option text (visible, not hidden): modify or delete an existing task via the task domain.</p></label>
+          <label class="field"><span data-i18n="chg.textLabel">Change text (one per line; the chosen operation applies to every line)</span>
+            <textarea autocomplete="off" id="proposal-change" rows="3" placeholder="Clarify the input scope: UTF-8 only at most 200 chars" data-i18n-placeholder="chg.textPlaceholder"></textarea></label>
+          <label class="field"><span data-i18n="proposal.riskLabel">Risks / uncertainties (one per line)</span>
+            <textarea autocomplete="off" id="proposal-risk" rows="2" placeholder="The reference model revision is not confirmed yet" data-i18n-placeholder="proposal.riskPlaceholder"></textarea></label>
+          <label class="field"><span data-i18n="proposal.actionLabel">Items I need to confirm (one per line)</span>
+            <textarea autocomplete="off" id="proposal-action" rows="2" placeholder="Whether to include it in the next RTL change window" data-i18n-placeholder="proposal.actionPlaceholder"></textarea></label>
+          <p class="hint"><span data-i18n="proposal.hintPre">Acceptance criteria belong to the task (carried after approval); a proposal only records changes, risks and open questions (design §5.3).</span>
+             <code>human</code> is recorded as the creator.</p>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <span class="dialog-status" id="proposal-status" role="status" aria-live="polite"></span>
+      <button type="button" class="btn" data-dialog-close="proposal-dialog" value="cancel" data-i18n="dialog.cancel">Cancel</button>
+      <button type="submit" class="btn primary" id="proposal-submit" value="ok" data-i18n="proposal.submit">Copy instruction and close</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 有副作用操作的二次确认（归档、延期）。Content由 app.js 按动作填写。 -->
+<dialog id="confirm-dialog" aria-labelledby="confirm-title">
+  <form method="dialog" class="dialog-form" id="confirm-form">
+    <div class="dialog-head">
+      <div>
+        <h2 id="confirm-title" data-i18n="dialog.confirmTitle">Confirm</h2>
+        <p class="subtle" id="confirm-note"></p>
+      </div>
+      <button type="button" class="icon-btn" data-dialog-close="confirm-dialog" aria-label="Close" data-i18n-aria="dialog.closeAria">&times;</button>
+    </div>
+    <div class="dialog-body" id="confirm-body"></div>
+    <div class="dialog-foot">
+      <span class="dialog-status" id="confirm-status" role="status" aria-live="polite"></span>
+      <button type="button" class="btn" data-dialog-close="confirm-dialog" value="cancel" data-i18n="dialog.cancel">Cancel</button>
+      <button type="submit" class="btn primary" id="confirm-ok" value="ok" data-i18n="dialog.ok">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 新建任务（POST /ui-pm/tasks）：标题 + Projects + 多条验收标准 -->
+<dialog id="task-dialog" aria-labelledby="task-dialog-title">
+  <form method="dialog" class="dialog-form" id="task-form">
+    <div class="dialog-head">
+      <div>
+        <h2 id="task-dialog-title" data-i18n="task.title">New task</h2>
+        <p class="subtle"><span data-i18n="task.subtitlePre">Writes to project key=</span><span id="task-project"></span><span data-i18n="task.subtitlePost"> in tasks.org (Org TODO, §5.2)</span></p>
+      </div>
+      <button type="button" class="icon-btn" data-dialog-close="task-dialog" aria-label="Close" data-i18n-aria="task.closeAria">&times;</button>
+    </div>
+    <div class="dialog-body">
+      <label class="field"><span data-i18n="task.titleLabel">Title (required)</span>
+        <input autocomplete="off" type="text" id="task-title" placeholder="One line on what has to be done" data-i18n-placeholder="task.titlePlaceholder"></label>
+      <label class="field"><span data-i18n="task.goalLabel">Goal</span>
+        <input autocomplete="off" type="text" id="task-goal" placeholder="Why, and to what extent" data-i18n-placeholder="task.goalPlaceholder"></label>
+      <label class="field"><span data-i18n="task.nongoalLabel">Non-goals</span>
+        <input autocomplete="off" type="text" id="task-nongoal" placeholder="What is explicitly out of scope" data-i18n-placeholder="task.nongoalPlaceholder"></label>
+      <label class="field"><span data-i18n="task.criteriaLabel">Acceptance criteria (one per line)</span>
+        <textarea autocomplete="off" id="task-criteria" rows="4" placeholder="List the input version&#10;List the reference model revision&#10;State how failures are judged" data-i18n-placeholder="task.criteriaPlaceholder"></textarea></label>
+      <div class="notice" data-i18n="task.notice">New tasks start as TODO (in the Inbox column). Criteria can be ticked one by one later; only a human may move REVIEW to DONE.</div>
+    </div>
+    <div class="dialog-foot">
+      <span class="dialog-status" id="task-status" role="status" aria-live="polite"></span>
+      <!-- 默认提交按钮 = 树序第一个 submit：放前面，浏览器里回车才会走「创建任务」而不是「取消」；
+           视觉顺序由 .dialog-foot 的 order 保持（取消在左、创建任务在右） -->
+      <button type="submit" class="btn primary" id="task-submit" value="ok" data-i18n="task.submit">Create task</button>
+      <button type="button" class="btn" data-dialog-close="task-dialog" value="cancel" data-i18n="dialog.cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+/* task-204 一期：在任何渲染前把语言定下来（防跳变）——URL ?lang= > localStorage > 宿主 html[lang] > navigator > 中文。
+   ⚠️ 这份内联预解析与 frontend_impl/pm-i18n.js 的 detectLang/resolveLang 是**同一条规则的两份实现**（内联这份只为了防跳变）：
+   改一处必须改另一处；能用同一实现时优先复用。
+   内嵌 DSH 时本页是同源 iframe，宿主把语言写在 parent.document.documentElement.lang（见 @deepseek-ai/dsh-client-locale）。 */
+(function () {
+  try {
+    var p = new URLSearchParams(location.search).get('lang');
+    var norm = function (v) { v = String(v || '').toLowerCase(); return (v === 'zh' || v.indexOf('zh-') === 0) ? 'zh' : ((v === 'en' || v.indexOf('en-') === 0) ? 'en' : ''); };
+    var host = '';
+    try { var pd = (window.parent && window.parent !== window) ? window.parent.document : null; if (pd && pd.documentElement) host = pd.documentElement.getAttribute('lang') || ''; } catch (e) {}
+    var lang = norm(p) || norm(localStorage.getItem('pm-lang')) || norm(host) || norm(navigator.language) || 'zh';
+    document.documentElement.setAttribute('data-lang', lang);
+  } catch (e) { /* 探测失败 → app.js 里还有一次机会 */ }
+})();
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

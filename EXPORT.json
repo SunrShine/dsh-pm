@@ -1,0 +1,160 @@
+{
+  "generatedBy": "tools/export-public.py",
+  "generatedAt": "2026-10-22T14:49:07+0800",
+  "license": "MIT",
+  "releaseVersion": "0.3.1",
+  "source": {
+    "repo": "dsh-pm（private 开发仓库）",
+    "commit": "535e8391ef6b296c387b31d8191c23365224c6f8",
+    "branch": "HEAD",
+    "dirty": false,
+    "dirtyPaths": []
+  },
+  "public": {
+    "author": "SunrShine",
+    "githubUser": "SunrShine",
+    "repo": "SunrShine/dsh-pm",
+    "email": "SunrShine@users.noreply.github.com"
+  },
+  "plugin": {
+    "mode": "require",
+    "libFiles": 55,
+    "contractFiles": 57,
+    "appFiles": 24,
+    "packageJsonFiles": [
+      "lib/**",
+      "route-contract.json",
+      "ROUTE-CONTRACT.md",
+      "app/**",
+      "cordis.patch.yml",
+      "README*",
+      "LICENSE"
+    ],
+    "packageJsonDeltas": [
+      "name -> dsh-pm",
+      "version -> 0.3.1（跟随 pyproject.toml；原插件构建版本 0.2.1-alpha.1）",
+      "description 追加 npm 同名包警告",
+      "dsh.bundle.patch -> ./cordis.patch.yml",
+      "peerDependencies 整段删除（D2：不声明 dsh* peer）",
+      "exports['./src/*'] 删除（公开仓库 src/ 是 Python 包）",
+      "author -> SunrShine",
+      "devDependencies: workspace:* -> npm 真版本 + 工具链版本抄 checkout 根",
+      "files: 按源包 files 契约派生 -> lib/**, route-contract.json, ROUTE-CONTRACT.md, app/**, cordis.patch.yml, README*, LICENSE"
+    ],
+    "dirty": false,
+    "dirtyPaths": [],
+    "sourceCommit": "1b3e53832634019ab6df9478e4ef96b3522d4850"
+  },
+  "assets": {
+    "files": 19,
+    "bytes": 1532733,
+    "items": [
+      [
+        "assets/screenshots/board-dag.png",
+        112424
+      ],
+      [
+        "assets/screenshots/board-dag.zh-CN.png",
+        114916
+      ],
+      [
+        "assets/screenshots/inbox.png",
+        93617
+      ],
+      [
+        "assets/screenshots/inbox.zh-CN.png",
+        116730
+      ],
+      [
+        "assets/screenshots/memory-candidates.png",
+        62242
+      ],
+      [
+        "assets/screenshots/memory-link-hover.png",
+        67433
+      ],
+      [
+        "assets/screenshots/memory-page.png",
+        60255
+      ],
+      [
+        "assets/screenshots/memory-tier-all.png",
+        66023
+      ],
+      [
+        "assets/screenshots/project-brief.png",
+        92185
+      ],
+      [
+        "assets/screenshots/project-brief.zh-CN.png",
+        92678
+      ],
+      [
+        "assets/screenshots/prompt-export-dialog.png",
+        37103
+      ],
+      [
+        "assets/screenshots/prompt-library.png",
+        95532
+      ],
+      [
+        "assets/screenshots/review.png",
+        65768
+      ],
+      [
+        "assets/screenshots/review.zh-CN.png",
+        69041
+      ],
+      [
+        "assets/screenshots/sidebar-entry.png",
+        22626
+      ],
+      [
+        "assets/screenshots/task-history.png",
+        83761
+      ],
+      [
+        "assets/screenshots/task-history.zh-CN.png",
+        88088
+      ],
+      [
+        "assets/screenshots/workbench.png",
+        95227
+      ],
+      [
+        "assets/screenshots/workbench.zh-CN.png",
+        97084
+      ]
+    ],
+    "limitBytes": 2097152,
+    "overLimit": false
+  },
+  "python311": {
+    "status": "pass",
+    "interpreter": "python3.11",
+    "interpreterVersion": "Python 3.11.17",
+    "realTest": {
+      "ran": true,
+      "interpreter": "python3.11",
+      "interpreterVersion": "Python 3.11.17",
+      "tests": 1021,
+      "result": "ok",
+      "exitCode": 0,
+      "durationSec": 66.4
+    },
+    "reason": null,
+    "exitCode": 0
+  },
+  "counts": {
+    "files": 260,
+    "bytes": 5933665,
+    "copiedFromSource": 175,
+    "transformedFiles": 57,
+    "note": "files/bytes 含 EXPORT.json 自身"
+  },
+  "notes": [
+    "内部记录目录与截图不随公开副本发布（含真实项目路径与会话 ID）。",
+    "app/ 是 frontend_impl/ 全部扁平前端文件的打包映射；lib/ 是插件包预构建产物。",
+    "本文件不含任何本机绝对路径或凭据。"
+  ]
+}

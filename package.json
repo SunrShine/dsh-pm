@@ -1,0 +1,88 @@
+{
+  "name": "dsh-pm",
+  "description": "Work-memory panel: list work cards that need attention and jump to their Session Unofficial: the npm package named dsh-pm is not this project.",
+  "version": "0.3.1",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./route-contract.json": "./route-contract.json",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ],
+      "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SunrShine/dsh-pm.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.5-alpha.1",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-api-workspace-controller": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-layout": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-workspace": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-host-webserver": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-session": "0.2.1-alpha.2",
+    "@types/node": "^22.20.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "oxlint": "1.76.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "scripts": {
+    "build": "tsdown --config-loader native --env.DSH_BUILD_FACE client",
+    "typecheck": "tsc -b tsconfig.json",
+    "test": "vitest run tests",
+    "lint": "oxlint"
+  },
+  "files": [
+    "lib/**",
+    "route-contract.json",
+    "ROUTE-CONTRACT.md",
+    "app/**",
+    "cordis.patch.yml",
+    "README*",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "author": "SunrShine",
+  "homepage": "https://github.com/SunrShine/dsh-pm#readme",
+  "bugs": {
+    "url": "https://github.com/SunrShine/dsh-pm/issues"
+  }
+}
