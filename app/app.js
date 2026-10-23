@@ -603,6 +603,11 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
       loadInbox().then(function () { selectNoteById(id); render(); });
       return;
     }
+    /* 来源筛选是纯客户端过滤：条目还在内存里、只是被来源滤掉 ⇒ 先清来源再选，
+       否则右栏选中了、列表里却看不见这条（与上面状态过滤的处理口径一致）。 */
+    if (found && state.inboxOrigin && !filteredEntries().some(function (x) { return x.e.id === id; })) {
+      state.inboxOrigin = '';
+    }
     selectNoteById(id);
     render();
   }
@@ -3037,6 +3042,17 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     });
   }
 
+  /* 来源筛选（客户端）：多文件 inbox 后每条都带 origin（human / ai）与 file 文件名。
+     旧 payload / cards 回退可能没有 origin ⇒ 按文件名兜底识别；仍未知就归空串（只在「全部来源」里出现）。 */
+  function noteOrigin(e) {
+    var o = String((e && e.origin) || '').toLowerCase();
+    if (o === 'human' || o === 'ai') return o;
+    var f = String((e && e.file) || '');
+    if (f.indexOf('inbox-ai') === 0) return 'ai';
+    if (f.indexOf('inbox-human') === 0) return 'human';
+    return '';
+  }
+
   function filteredEntries() {
     var all = (state.inbox && state.inbox.entries) ? state.inbox.entries : [];
     var visible = all;
@@ -3044,10 +3060,21 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     else if (state.inboxStatus !== '*') {
       visible = all.filter(function (e) { return String(e.status || '').toUpperCase() === state.inboxStatus; });
     }
+    if (state.inboxOrigin) {
+      visible = visible.filter(function (e) { return noteOrigin(e) === state.inboxOrigin; });
+    }
     var q = state.q.trim().toLowerCase();
     return visible
       .map(function (e) { return { e: e, i: all.indexOf(e) }; })
       .filter(function (x) { return !q || String(x.e.text).toLowerCase().indexOf(q) >= 0; });
+  }
+
+  /* 改来源筛选后，若右栏选中的那条已被滤掉，就挪到列表里第一条可见的（别让右栏显示列表外的条目） */
+  function clampNoteToVisible() {
+    var visible = filteredEntries();
+    if (!visible.length) { state.note = -1; return; }
+    var still = visible.some(function (x) { return x.i === state.note; });
+    if (!still) state.note = visible[0].i;
   }
 
   function viewInbox() {
@@ -3100,6 +3127,13 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
         return '<option value="' + s + '"' + (state.inboxStatus === s ? ' selected' : '') + '>' + s + '</option>';
       }).join('') +
       '</select>' +
+      /* 来源筛选（三态：全部 / 人工 / AI）与状态筛选**叠加**：状态走端点参数，来源在客户端再过滤一层 */
+      '<label class="sr-only" for="inbox-origin">' + esc(t('inbox.originFilterAria')) + '</label>' +
+      '<select id="inbox-origin" style="max-width:150px" aria-label="' + esc(t('inbox.originFilterAria')) + '">' +
+      '<option value=""' + (state.inboxOrigin === '' ? ' selected' : '') + '>' + esc(t('inbox.originAll')) + '</option>' +
+      '<option value="human"' + (state.inboxOrigin === 'human' ? ' selected' : '') + '>' + esc(t('inbox.originHuman')) + '</option>' +
+      '<option value="ai"' + (state.inboxOrigin === 'ai' ? ' selected' : '') + '>' + esc(t('inbox.originAi')) + '</option>' +
+      '</select>' +
       notYet(t('inbox.filterByProject'), t('inbox.filterNotYet')) +
       '</div>';
 
@@ -3111,7 +3145,7 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
       html += '<div class="empty">' +
         (inbox.status ? esc(format(t('inbox.noStatusEntries'), { s: inbox.status })) : esc(t('inbox.emptyInbox'))) + '</div>';
     } else if (!list.length) {
-      html += '<div class="empty">' + esc(t('inbox.noMatch')) + '</div>';
+      html += '<div class="empty">' + esc(state.inboxOrigin ? t('inbox.originEmpty') : t('inbox.noMatch')) + '</div>';
     } else {
       list.forEach(function (x) { html += noteRowHtml(x.e, x.i); });
     }
@@ -3127,12 +3161,14 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
   function noteRowHtml(e, i) {
     var isLegacy = !e.id;
     var selected = state.note === i;
+    var origin = noteOrigin(e);
     var can = inboxActionState(e);
     var until = e.snoozeUntil ? esc(format(t('note.snoozeUntil'), { t: e.snoozeUntil })) : '';
     /* #23：整行可点却进不了 Tab 序 ⇒ 根用 <button>（原生可聚焦、Enter/Space 可激活）；选中态补 aria-current ✓ */
     /* 用户裁定（2026-10-19）：卡片必须**包含**操作按钮 —— 原根是 <button>，里面嵌按钮被浏览器拆到外面 ✗。
        改成 <article class="note">（承载卡片观感/焦点/选中）+ 内层 <button class="note-main">（文字/meta，原生可聚焦）+ .note-actions（现在真在卡内 ✓）。*/
     return '<article class="note' + (selected ? ' selected' : '') + '" data-note="' + i + '"' +
+      ' data-origin="' + origin + '"' + (e.file ? ' data-file="' + esc(e.file) + '"' : '') +
       (selected ? ' aria-current="true"' : '') + '>' +
       '<button type="button" class="note-main" data-note-main="' + i + '">' +
       '<div class="note-body">' +
@@ -3141,6 +3177,12 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
       (isLegacy
         ? '<span class="chip dashed" title="' + esc(t('note.legacyChipTitle')) + '">' + esc(t('note.legacyName')) + '</span>'
         : '<span class="chip solid">' + esc(e.status) + '</span>') +
+      /* 来源徽章（轻量）：多文件 inbox 后区分人工 / AI；文件名放 title，不占行宽 */
+      (origin
+        ? '<span class="chip' + (origin === 'ai' ? ' dashed' : '') + '" data-origin-chip="' + origin + '" title="' +
+          esc(format(t('inbox.originFileTitle'), { f: e.file || t('inbox.originUnknownFile') })) + '">' +
+          esc(origin === 'ai' ? t('inbox.originAi') : t('inbox.originHuman')) + '</span>'
+        : '') +
       /* 2026-10-19 用户：LEGACY 行只显示「老记录（无 ID）· 第 N 行」；无 rev/捕获时间就**不显示** ✗（别把"没有这个属性"当信息）*/
       (isLegacy ? '' : '<span>' + esc(t('note.idPrefix')) + esc(e.id) + '</span>') +
       (isLegacy ? '' : '<span>rev ' + (typeof e.revision === 'number' ? e.revision : '—') + '</span>') +
@@ -6874,6 +6916,16 @@ return html;
         state.inboxStatus = statusSelect.value;
         state.note = 0;
         loadInbox().then(render);
+      });
+    }
+
+    /* 收件箱：来源过滤（客户端，与状态过滤叠加；不需要重新拉取端点） */
+    var originSelect = el.content.querySelector('#inbox-origin');
+    if (originSelect) {
+      originSelect.addEventListener('change', function () {
+        state.inboxOrigin = (originSelect.value === 'human' || originSelect.value === 'ai') ? originSelect.value : '';
+        clampNoteToVisible();
+        render();
       });
     }
 

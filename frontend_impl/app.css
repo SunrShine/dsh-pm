@@ -903,6 +903,9 @@ dialog::backdrop{background:rgba(16,24,39,.42)}
    app.css 的通用 select/.btn 规则会把 display 拉成 block、font-weight 拉成 700 ⇒ 此处显式写全 ✓（用户裁定 ⒝：页面侧覆盖，不改 docs）。*/
 #pmMemoryPage .filters select#fscope{display:inline-block;width:auto;font-weight:400}
 
+/* 记忆页检索：过滤行（scope/类型 + 命中档位说明）—— 2026-10-23 补上缺失样式（类覆盖判据报未定义） */
+.mem-search-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px}
+
 /* 记忆页/提示词页：页面自带 h1+hint ⇒ 隐藏外层 topbar 标题块（防两套标题并存 ✗）*/
 body.embed-page-h1 .topbar-title{display:none}
 

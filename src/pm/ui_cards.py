@@ -6,7 +6,7 @@
     capabilities      本实现支持的能力列表，当前 ["cards","inbox","subagents"]
     generated_at      扫描时间（ISO8601）
     library           work-memory 库绝对路径，未配置为 null
-    inbox             快速笔记（库根 inbox.org）：{path, count, entries[{text,line,id,status}]}；
+    inbox             快速笔记（多文件 inbox 聚合）：{path, count, files[], counts, entries[{…, origin, file}]}；
                       entries[].id 是 :ID:（无则 null），status = PM_STATUS 或 LEGACY_UNTRACKED；
                       条目还带 capturedAt/source/projectHint 与补充计数
                       annotationCount/revisionCount/lastAnnotationText

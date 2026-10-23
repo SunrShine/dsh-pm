@@ -2,6 +2,35 @@
 
 本项目遵循 Keep a Changelog 的写法；版本号在第一次正式发布前不承诺语义化兼容。
 
+## [0.3.2] - 2026-10-23
+
+本版主题：**多文件 inbox**（人工按周 / AI 按月轮转，`inbox.org` 变生成视图）+ UI 来源筛选 + Emacs 集成 + 文档同步。
+
+### Added
+- **多文件 inbox**（用户 2026-10-22 设计）：真源 `inbox-human-<period>.org`（默认 weekly）/
+  `inbox-ai-<period>.org`（默认 monthly）；归档=**时间轮转、不搬文件**（已处理状态留在原周期文件）；
+  `inbox.org` 改为 `pm inbox render` 生成**只读汇总视图**（当前人工/AI 内联、历史只列链接）。
+- 配置 `[inbox] human_mode / ai_mode`（weekly/monthly/quarterly/yearly/single/per-entry；代码默认 single 兼容旧库）。
+- 新命令：`pm inbox files`、`pm inbox render [--check]`、`pm inbox migrate [--dry-run|--write]`；
+  `pm inbox list --origin human|ai`（保留原有 status 筛选）。
+- capture 按来源路由（CLI/UI→人工文件；MCP/AI→AI 文件），dry-run 零落盘；文件头带人工手写模板 / AI 勿手改说明。
+- UI 收件箱：**来源筛选器**（全部/人工/AI）+ 每行来源徽章，与既有 status 筛选叠加；新活判据 `verify_inbox_origin_filter.mjs`。
+- Emacs：`pm.el` 适配多文件（agenda 只挂人工轮转文件；`pm-inbox-open-current` / `pm-capture-inbox` /
+  `pm-insert-inbox-entry` / `pm-inbox-render` / `pm-inbox-open-file` / `pm-install-capture-template`），
+  org-capture 模板（键 p）自动带 `:ID:/:PM_STATUS:/:PM_CAPTURED_AT:`；新增 `emacs/`（README + yasnippet）。
+
+### Changed
+- `pm inbox list` 显示人工/AI 计数与文件清单；读取聚合所有真源文件（条目带 `origin` / `file`）。
+- pin / snooze / annotate / edit / merge 等按 `:ID:` **跨文件定位**并写回所在文件。
+- 旧单文件库可无痛迁移：`pm inbox migrate --write` 先备份；真实库 40 块 → human W42(20)/W43(6) + ai 2026-10(14)。
+- README / README.zh-CN / USAGE(.zh-CN) / 内部记录/01 03 06 09 按多文件 inbox 更新（并修过时版本/命令/表格）。
+
+### Tests
+- 新增 `tests/test_inbox_multifile.py`（11 例）；全量 **1032 tests OK**；
+- 前端：node --check / tests/frontend 93 pass / selfcheck 无 ✗；新活判据对真实库 PASS（all 40 = human 26 + ai 14），自证能红。
+
+### Public copy
+- 公开副本首次包含 Emacs 集成：仓库根 `pm.el` + `emacs/`（README / yasnippet），路径按 TSV 脱敏为 `<pm-root>`。
 ## [0.3.1] - 2026-10-22
 
 本版主题：**修复公开仓库首轮 CI**（python 3.11/3.12 绿，frontend selfcheck 红）+ 本地门禁与 CI 对齐。

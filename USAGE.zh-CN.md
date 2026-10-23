@@ -30,7 +30,8 @@ pm capture --config ~/my-work-memory/pm.toml "今天先把 CLI 那半跑起来" 
 pm inbox list --config ~/my-work-memory/pm.toml
 ```
 
-- `library = "~/..."` 支持 `~` 展开；`pm init` 建的是 `inbox.org` / `overrides.org` / `README.org` / `.gitignore`。
+- `library = "~/..."` 支持 `~` 展开；`pm init` 建的是 `inbox.org` / `overrides.org` / `README.org` / `.gitignore`
+  （这里的 `inbox.org` 是骨架文件；用上 §3.5 的多文件收件箱后，条目本身落在 `inbox-human-*.org` / `inbox-ai-*.org`，`inbox.org` 变成生成视图）。
 - **写入门禁**：没有显式给 `--config`（也没用两个环境变量）时，写命令必须加 `--yes`，否则会被 `NEEDS_YES` 拒绝 —— 这是防止误写默认库。只想预演加 `--dry-run`（不需要 `--yes`）。
 
 ## 2. 让 agent 会用
@@ -136,6 +137,35 @@ pm task transition <task-id> --config ~/my-work-memory/pm.toml --project demo-ap
 
 **所有写命令都是 CAS**：先 `task show` 拿到 `revision`，再带 `--expected-revision`；不一致 → `exit 3`（409），一字节不写。
 
+### 3.5 收件箱是分文件的（人工按周 / AI 按月）
+
+收件箱不再是一个文件：真源是 `inbox-human-<周期>.org`（人工写入，默认**按周**，如 `inbox-human-2026-W43.org`）与
+`inbox-ai-<周期>.org`（AI / MCP 写入，默认**按月**，如 `inbox-ai-2026-10.org`）；`inbox.org` 是**自动生成的汇总视图（只读）**。
+
+```bash
+# 打开轮转。代码默认是 "single"，旧库不配也照原样跑。
+cat >> ~/my-work-memory/pm.toml <<'EOF'
+
+[inbox]
+human_mode = "weekly"     # weekly | monthly | quarterly | yearly | single | per-entry
+ai_mode    = "monthly"    # monthly | quarterly | yearly | single
+EOF
+
+pm capture --config ~/my-work-memory/pm.toml "…"             # CLI = 人工 → inbox-human-2026-W43.org
+# 同一个 capture 工具走 MCP（source=mcp）时写 AI 文件：inbox-ai-2026-10.org
+
+pm inbox files  --config ~/my-work-memory/pm.toml            # 现有真源文件（来源 + 文件名）
+pm inbox list   --config ~/my-work-memory/pm.toml --origin ai
+pm inbox render --config ~/my-work-memory/pm.toml            # 重写只读的 inbox.org 视图
+pm inbox render --config ~/my-work-memory/pm.toml --check    # 视图过期 → exit 1，一字节不写
+```
+
+- **归档=时间轮转，不搬文件**：`pm inbox archive` 只写状态；条目留在它被写入的那个周期文件里，所以「第 43 周」始终能在 `inbox-human-2026-W43.org` 里读到。
+- **不要手改 `inbox.org`** —— 下一次 `pm inbox render` 会覆盖它。要改就改 `inbox-human-<周期>.org`（它的文件头带可复制的条目模板）。
+- 旧库还只有一个混装 `inbox.org`：`pm inbox migrate`（默认 dry-run）先打印每个块会去哪；
+  `pm inbox migrate --write` 把旧文件备份成 `inbox.org.bak.<YYYYmmdd-HHMMSS>`，按来源/周期拆开，再重生成视图。
+- 每个动作（`archive` / `annotate` / `edit` / `pin` / …）仍按 `:ID:` 寻址，写入落在当前装着它的那个文件里。
+
 ## 4. 和 DSH 一起用
 
 ```bash
@@ -157,7 +187,7 @@ dsh plugin add github:SunrShine/dsh-pm
 - **显式来源必须存在且可解析**：打错一个字符就直接失败（`CONFIG_NOT_FOUND` / `CONFIG_INVALID`），**绝不静默回落到默认库**。
 - `DSH_UI_PM_CONFIG` 是**实例作用域**：插件侧与 `pm mcp` 侧都认它，两个都设时读的是同一个库，不会分叉。
 - 隔离一个一次性实例：用 `--dsh-home`（或 `PM_DSH_HOME`）做单实例覆盖；要操作全部数据根用 `pm skill install --all-instances`。
-- `pm.toml` 里两类东西：`library`（库根）与多个 `[[instance]]`（`id` / `path` / `role`），外加视图参数 `active_days` / `active_hours` / `row_limit` / `exclude_paths`。
+- `pm.toml` 里两类东西：`library`（库根）与多个 `[[instance]]`（`id` / `path` / `role`），外加视图参数 `active_days` / `active_hours` / `row_limit` / `exclude_paths`，以及收件箱轮转 `[inbox] human_mode` / `ai_mode`（`single` = 单文件 `inbox.org`）。
 - 写闸门与 env 无关：两个环境变量都设，写命令**仍然**要 `--yes`（除非你用 `--config` 显式指了库）。
 
 ## 6. 常见问题
@@ -167,7 +197,9 @@ dsh plugin add github:SunrShine/dsh-pm
 | `pm: [NO_LIBRARY]` | `pm.toml` 里没有 `library`；补上库根即可 |
 | `pm: [CONFIG_NOT_FOUND]` / `[CONFIG_INVALID]` | 显式配置路径不存在或 TOML 坏了。**不会**回落默认库（这是有意的） |
 | `pm: [NEEDS_YES]` | 写命令没显式 `--config` 也没 `--yes`；加 `--yes` 或显式指库 |
-| `[LEGACY_UNTRACKED]` | 收件箱里没有 `:ID:` 的旧条目（身份只认 `:ID:`，旧条目会被标出来而不是猜） |
+| `[LEGACY_UNTRACKED]` | 收件箱里没有 `:ID:` 的旧条目（身份只认 `:ID:`，旧条目会被标出来而不是猜；拆分后它们留在人工文件里，直到你补上 ID） |
+| 我改的 `inbox.org` 不见了 | `inbox.org` 是**生成视图**：下一次 `pm inbox render` 会覆盖它。改周期文件（`pm inbox files` 能列出），再重新渲染 |
+| `pm inbox render --check` 退出 1 | 视图比真源旧：跑一次 `pm inbox render`（不需要 `--write`；`--check` 永不写） |
 | `[DONE_REQUIRES_HUMAN]` | AI/系统在写 `DONE`；改成 `--to REVIEW`，由人验收 |
 | `[INVALID_TRANSITION]` | 跳级了（如 TODO → REVIEW）；按 3.2 的箭头逐级走 |
 | `exit 3`（409） | `revision` 不是最新的；重新 `task show` 拿新值再写 |
@@ -182,6 +214,10 @@ dsh plugin add github:SunrShine/dsh-pm
 | --- | --- |
 | 记一条 | `pm capture --config ~/my-work-memory/pm.toml "…"` |
 | 看收件箱 | `pm inbox list --config ~/my-work-memory/pm.toml` |
+| 看真源文件 | `pm inbox files --config ~/my-work-memory/pm.toml` |
+| 只看 AI（或人工）条目 | `pm inbox list --config ~/my-work-memory/pm.toml --origin ai` |
+| 重生成 `inbox.org` 视图 | `pm inbox render --config ~/my-work-memory/pm.toml`（只校验：`--check`） |
+| 拆旧单文件收件箱 | `pm inbox migrate --config ~/my-work-memory/pm.toml`，确认后加 `--write` |
 | 置顶一条 | `pm inbox pin <inbox-id> --config ~/my-work-memory/pm.toml --expected-revision 1` |
 | 建项目 | `pm project create demo-app --config ~/my-work-memory/pm.toml --title "演示项目"` |
 | 列项目 | `pm project list --config ~/my-work-memory/pm.toml --json` |

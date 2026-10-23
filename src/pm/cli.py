@@ -31,6 +31,7 @@ from pm.config import (
     detect_running_home,
     load as load_config,
 )
+from pm import inbox_files
 from pm import inbox_ops
 from pm.inbox import INBOX_RELATIVE, read_inbox
 from pm.instances import load_all
@@ -409,9 +410,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     inbox_list = inbox_sub.add_parser("list", help="列出 inbox 条目（含 id / status / revision）")
     inbox_list.add_argument("--status", metavar="S", help="只看某个状态，如 CAPTURED / ARCHIVED / SNOOZED")
+    inbox_list.add_argument("--origin", choices=("human", "ai"), help="只看某个来源（人工 / AI）")
     inbox_list.add_argument("--json", action="store_true", help="输出 JSON")
     _add_common_options(inbox_list, as_defaults=True)
     inbox_list.set_defaults(handler=_command_inbox_list)
+
+    inbox_files_cmd = inbox_sub.add_parser("files", help="列出多文件 inbox 的真源文件（人工/AI 轮转文件）")
+    inbox_files_cmd.add_argument("--json", action="store_true", help="输出 JSON")
+    _add_common_options(inbox_files_cmd, as_defaults=True)
+    inbox_files_cmd.set_defaults(handler=_command_inbox_files)
+
+    inbox_render = inbox_sub.add_parser("render", help="生成/校验 inbox.org 汇总视图（只读视图）")
+    inbox_render.add_argument("--check", action="store_true", help="只校验是否最新（过期 exit 1，不写）")
+    inbox_render.add_argument("--json", action="store_true", help="输出 JSON")
+    _add_common_options(inbox_render, as_defaults=True)
+    inbox_render.set_defaults(handler=_command_inbox_render)
+
+    inbox_migrate = inbox_sub.add_parser("migrate", help="把旧单文件 inbox.org 拆成来源/周期文件（默认 dry-run）")
+    inbox_migrate.add_argument("--write", action="store_true", help="真的写（默认只 dry-run 打印去向）")
+    inbox_migrate.add_argument("--json", action="store_true", help="输出 JSON")
+    _add_common_options(inbox_migrate, as_defaults=True)
+    inbox_migrate.set_defaults(handler=_command_inbox_migrate)
 
     def _add_inbox_write_flags(parser: argparse.ArgumentParser) -> None:
         parser.add_argument("inbox_id", metavar="INBOX_ID", help="条目 :ID:（身份只看 ID，不看行号）")
@@ -1130,8 +1149,9 @@ def _command_capture(args: argparse.Namespace) -> int:
     layout, gate_error = _resolve_write_target(args, json_mode)
     if layout is None:
         return _capture_error(json_mode, gate_error[1], gate_error[0])
-    if layout.inbox.exists() and not layout.inbox.is_file():
-        return _capture_error(json_mode, f"inbox 路径不是普通文件: {layout.inbox}")
+    # [inbox] 轮转粒度（人工 weekly / AI monthly 默认）；写入文件由 pm.mcp.capture_text 选
+    capture_config, _w = load_config(getattr(args, "config", None))
+    inbox_modes = capture_config.inbox.modes()
 
     # 复用 MCP 工具的同一条实现；preview 与真写共用 capture_block + 插入位置算法，
     # 所以 --dry-run 显示的行号/块内容就是真写时会落下的那一份。
@@ -1139,7 +1159,8 @@ def _command_capture(args: argparse.Namespace) -> int:
 
     if dry_run:
         plan = plan_capture(
-            layout.root, text, source="cli", model="cli", project_hint=args.project
+            layout.root, text, source="cli", model="cli", project_hint=args.project,
+            inbox_modes=inbox_modes,
         )
         try:
             planned_relative = str(plan.path.relative_to(layout.root))
@@ -1175,7 +1196,8 @@ def _command_capture(args: argparse.Namespace) -> int:
         return 0
 
     result = capture_text(
-        layout.root, text, source="cli", model="cli", project_hint=args.project
+        layout.root, text, source="cli", model="cli", project_hint=args.project,
+        inbox_modes=inbox_modes,
     )
     try:
         relative = str(result.path.relative_to(layout.root))
@@ -1231,7 +1253,7 @@ def _command_inbox_list(args: argparse.Namespace) -> int:
             inbox_ops.InboxOpError("NO_LIBRARY", "未配置 work-memory 库（pm.toml 缺 library）"),
         )
     try:
-        payload = inbox_ops.list_entries(Path(config.library), status=args.status)
+        payload = inbox_ops.list_entries(Path(config.library), status=args.status, origin=getattr(args, "origin", None))
     except inbox_ops.InboxOpError as exc:
         return _inbox_error(json_mode, exc)
 
@@ -1241,13 +1263,104 @@ def _command_inbox_list(args: argparse.Namespace) -> int:
     if not payload["entries"]:
         print("inbox 没有符合条件的条目。")
         return 0
-    print(f"inbox 条目 {payload['count']} 条（{payload['path']}，库 {config.library}）")
+    counts = payload.get("counts") or {}
+    files = payload.get("files") or []
+    if files:
+        print(f"inbox 条目 {payload['count']} 条（人工 {counts.get('human', 0)} · AI {counts.get('ai', 0)}；库 {config.library}）")
+        print("  文件：" + "、".join(f"{row['path']}({row['count']})" for row in files))
+    else:
+        print(f"inbox 条目 {payload['count']} 条（{payload['path']}，库 {config.library}）")
     for row in payload["entries"]:
         revision = row["revision"] if row["revision"] is not None else "-"
         until = f"  until {row['snoozeUntil']}" if row["snoozeUntil"] else ""
         identity = row["id"] or "(无 :ID:)"
         headline = row["text"].splitlines()[0] if row["text"] else ""
-        print(f"  [{row['status']}] {identity}  rev {revision}{until}  第 {row['line']} 行  {headline[:40]}")
+        origin = row.get("origin") or "?"
+        print(f"  [{row['status']}/{origin}] {identity}  rev {revision}{until}  第 {row['line']} 行  {headline[:40]}  ({row.get('file')})")
+    return 0
+
+
+def _inbox_config_or_error(args, json_mode):
+    config, _warnings = load_config(getattr(args, "config", None))
+    if config.library is None:
+        return None, _inbox_error(
+            json_mode,
+            inbox_ops.InboxOpError("NO_LIBRARY", "未配置 work-memory 库（pm.toml 缺 library）"),
+        )
+    return config, None
+
+
+def _command_inbox_files(args: argparse.Namespace) -> int:
+    """列出多文件 inbox 的真源文件（人工/AI 轮转文件 + 旧单文件）。"""
+    json_mode = bool(getattr(args, "json", False))
+    config, err = _inbox_config_or_error(args, json_mode)
+    if config is None:
+        return err
+    from pm import inbox_files
+    rows = inbox_files.discover(Path(config.library))
+    payload = {
+        "ok": True,
+        "path": inbox_files.inbox.INBOX_RELATIVE,
+        "files": [
+            {"path": row["name"], "origin": row["origin"], "legacy": row["legacy"]}
+            for row in rows
+        ],
+    }
+    if json_mode:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if not rows:
+        print("inbox 没有真源文件（可用 pm capture 创建第一个）")
+        return 0
+    for row in rows:
+        suffix = "（旧单文件，建议 pm inbox migrate）" if row["legacy"] else ""
+        print(f"  [{row['origin']}] {row['name']}{suffix}")
+    return 0
+
+
+def _command_inbox_render(args: argparse.Namespace) -> int:
+    """生成/校验 inbox.org 汇总视图（只读视图；真源是 inbox-human-*/inbox-ai-*）。"""
+    json_mode = bool(getattr(args, "json", False))
+    check = bool(getattr(args, "check", False))
+    config, err = _inbox_config_or_error(args, json_mode)
+    if config is None:
+        return err
+    from pm import inbox_files
+    result = inbox_files.render(Path(config.library), config.inbox.modes(), check=check)
+    if json_mode:
+        print(json.dumps({"ok": True, **result}, ensure_ascii=False, indent=2))
+    elif check:
+        print("inbox.org 与真源一致" if not result["changed"] else "inbox.org 已过期（pm inbox render 可刷新）")
+    else:
+        print("已生成 inbox.org 汇总视图" if result["written"] else "inbox.org 已是最新")
+    return 1 if (check and result["changed"]) else 0
+
+
+def _command_inbox_migrate(args: argparse.Namespace) -> int:
+    """把旧单文件 inbox.org 拆成来源/周期文件（默认 dry-run，--write 才写）。"""
+    json_mode = bool(getattr(args, "json", False))
+    dry_run = not bool(getattr(args, "write", False))
+    config, err = _inbox_config_or_error(args, json_mode)
+    if config is None:
+        return err
+    from pm import inbox_files
+    result = inbox_files.migrate(Path(config.library), config.inbox.modes(), dry_run=dry_run)
+    if json_mode:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    moves = result.get("moves") or []
+    if not moves:
+        print(result.get("reason") or "没有需要迁移的条目")
+        return 0
+    print(("[dry-run] 将迁移 " if dry_run else "已迁移 ") + str(len(moves)) + " 个块：")
+    for row in moves:
+        identity = row.get("id") or "(无 :ID: legacy)"
+        print(f"  [{row.get('origin')}] {identity}  {row.get('status')}  -> {row.get('target')}")
+    if dry_run:
+        print("确认后加 --write 真正执行（会先备份 inbox.org）")
+    else:
+        print("备份：" + str(result.get("backup")))
+        print("已重写 inbox.org 为汇总视图（pm inbox render）")
     return 0
 
 

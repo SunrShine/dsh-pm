@@ -1,7 +1,7 @@
 {
   "name": "dsh-pm",
   "description": "Work-memory panel: list work cards that need attention and jump to their Session Unofficial: the npm package named dsh-pm is not this project.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

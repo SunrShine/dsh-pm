@@ -123,34 +123,46 @@ def parse_until(value: str) -> str:
     return parsed.isoformat(timespec="seconds")
 
 
-def _inbox_path(library_root: Path) -> Path:
-    return Path(library_root) / inbox.INBOX_RELATIVE
+def _inbox_paths(library_root: Path) -> list[Path]:
+    """所有 inbox 真源文件（多文件布局：human/ai 轮转 + 旧单文件）。"""
+    from pm import inbox_files
+    return [row["path"] for row in inbox_files.discover(Path(library_root))]
 
 
 def _load_target(library_root: Path, inbox_id: str):
-    """按 :ID: 取 inbox 条目；inbox 特有的 LEGACY 判定也在这里。"""
-    path = _inbox_path(library_root)
-    if path.is_file():
+    """按 :ID: 在**所有 inbox 文件**里取条目；LEGACY 判定也跨文件。"""
+    paths = _inbox_paths(library_root)
+    not_found: entities.EntityError | None = None
+    for path in paths:
         try:
-            return entities.load_entity(path, inbox_id, headline=inbox.INBOX_HEADLINE)
+            entity = entities.load_entity(path, inbox_id, headline=inbox.INBOX_HEADLINE)
         except entities.EntityError as exc:
-            if exc.code == "NOT_FOUND":
-                # inbox 里「没有 :ID: 的顶层列表项」也算旧条目（entities 只认 headline 块）
-                untracked = [
-                    entry
-                    for entry in inbox.parse_entries(entities.read_text(path))
-                    if not entry["id"]
-                ]
-                if untracked:
-                    raise entities.legacy_error(inbox_id, len(untracked)) from None
+            # 单文件里可能有 legacy 块（会让 load_entity 抛 LEGACY_UNTRACKED）：
+            # 多文件下这不代表 ID 不存在 ⇒ 继续找下一个文件
+            if exc.code in ("NOT_FOUND", "LEGACY_UNTRACKED"):
+                if exc.code == "NOT_FOUND":
+                    not_found = exc
+                continue
             raise
-    return entities.load_entity(path, inbox_id, headline=inbox.INBOX_HEADLINE)
+        entity.source_path = path
+        return entity
+    untracked = 0
+    for path in paths:
+        try:
+            untracked += sum(1 for entry in inbox.parse_entries(entities.read_text(path)) if not entry["id"])
+        except entities.EntityError:
+            continue
+    if untracked:
+        raise entities.legacy_error(inbox_id, untracked) from None
+    if not_found is not None:
+        raise not_found
+    return entities.load_entity(Path(library_root) / inbox.INBOX_RELATIVE, inbox_id, headline=inbox.INBOX_HEADLINE)
 
 
 def _apply(library_root: Path, inbox_id: str, **kwargs) -> OpResult:
-    """inbox 语义的一次通用变更：先做 inbox 特有的 LEGACY 判定，再走 entities。"""
-    path = _inbox_path(library_root)
-    _load_target(library_root, inbox_id)
+    """inbox 语义的一次通用变更：先按 ID 定位**所在文件**，再走 entities。"""
+    entity = _load_target(library_root, inbox_id)
+    path = getattr(entity, "source_path", None) or (Path(library_root) / inbox.INBOX_RELATIVE)
     kwargs.setdefault("headline", inbox.INBOX_HEADLINE)
     kwargs.setdefault("validate", _validate)
     return entities.apply_change(path, inbox_id, **kwargs)
@@ -202,9 +214,7 @@ def snooze(
     )
     if "snoozeUntil" not in result.extra:
         try:
-            entity = entities.load_entity(
-                _inbox_path(library_root), inbox_id, headline=inbox.INBOX_HEADLINE
-            )
+            entity = _load_target(library_root, inbox_id)
             result.extra["snoozeUntil"] = entity.props.get("PM_SNOOZE_UNTIL") or parsed
         except entities.EntityError:  # pragma: no cover - dry-run 时文件仍应可读
             result.extra["snoozeUntil"] = parsed
@@ -347,7 +357,7 @@ def edit(
 def history(library_root: Path, inbox_id: str) -> dict:
     """只读：原文 + 补充块 + 修订块（按文件顺序 = 时间顺序）。"""
     entity = _load_target(library_root, inbox_id)
-    text = entities.read_text(_inbox_path(library_root))
+    text = entities.read_text(entity.source_path)
     target = None
     for block in inbox.iter_entry_blocks(text):
         if block["kind"] == "headline" and block["props"].get("ID") == inbox_id:
@@ -481,7 +491,8 @@ def note(
     now: datetime | None = None,
 ) -> OpResult:
     """保存为项目笔记：写入 memory 候选区（不进任务列表），源记录标 NOTE。"""
-    path = _inbox_path(library_root)
+    located = _load_target(library_root, inbox_id)
+    path = located.source_path
     at = now or datetime.now().astimezone()
     candidate_id = ids.new_entity_id("memory", int(at.timestamp() * 1000))
     audit_extra = {"note": candidate_id}
@@ -531,45 +542,60 @@ def note(
     return result
 
 
-def list_entries(library_root: Path, *, status: str | None = None) -> dict:
-    """列出 inbox 条目（含 revision / snoozeUntil），可按 status 过滤。"""
-    path = _inbox_path(library_root)
-    if not path.is_file():
-        return {"path": inbox.INBOX_RELATIVE, "count": 0, "entries": []}
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise InboxOpError("UNREADABLE", f"读不了 {path}: {exc}")
-    detail = {
-        block["line"]: block
-        for block in inbox.iter_entry_blocks(text)
-        if block["kind"] == "headline"
-    }
+def list_entries(library_root: Path, *, status: str | None = None, origin: str | None = None) -> dict:
+    """聚合列出所有 inbox 文件的条目（含 revision / snoozeUntil / origin / file）。"""
+    from pm import inbox_files
+    files = inbox_files.discover(Path(library_root))
     wanted = (status or "").strip().upper() or None
+    wanted_origin = (origin or "").strip().lower() or None
     entries: list[dict] = []
-    # with_annotations=True：同一趟解析就带出补充块全文（卡片直接渲染，不再 per-entry 调用）
-    for entry in inbox.parse_entries(text, with_annotations=True):
-        block = detail.get(entry["line"])
-        tracked = bool(entry["id"])
-        row = {
-            "id": entry["id"],
-            "status": entry["status"],
-            "revision": entities.revision_of(block["props"]) if (tracked and block) else None,
-            "snoozeUntil": (block["props"].get("PM_SNOOZE_UNTIL") or None) if block else None,
-            "text": entry["text"],
-            "line": entry["line"],
-            # 与 ui-cards 的 inbox.entries[] 保持同一组字段（前端要显示捕获时间/来源/项目提示）
-            "capturedAt": entry.get("capturedAt"),
-            "source": entry.get("source"),
-            "projectHint": entry.get("projectHint"),
-            # 补充/修订计数 + 补充块全文（同一趟解析的结果；旧条目计数一律 null、annotations 为 []）
-            "annotationCount": entry.get("annotationCount"),
-            "revisionCount": entry.get("revisionCount"),
-            "lastAnnotationText": entry.get("lastAnnotationText"),
-            "annotations": entry.get("annotations", []),
-            # 置顶：永远是 bool（缺 :PM_PIN: 或旧条目都是 false）
-            "pinned": bool(entry.get("pinned")),
+    file_rows: list[dict] = []
+    for row in files:
+        path = row["path"]
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise InboxOpError("UNREADABLE", f"读不了 {path}: {exc}")
+        detail = {
+            block["line"]: block
+            for block in inbox.iter_entry_blocks(text)
+            if block["kind"] == "headline"
         }
-        if wanted is None or row["status"].upper() == wanted:
-            entries.append(row)
-    return {"path": inbox.INBOX_RELATIVE, "count": len(entries), "entries": entries}
+        parsed = inbox.parse_entries(text, with_annotations=True)
+        file_rows.append({"path": row["name"], "origin": row["origin"], "count": len(parsed)})
+        for entry in parsed:
+            block = detail.get(entry["line"])
+            tracked = bool(entry["id"])
+            item = {
+                "id": entry["id"],
+                "status": entry["status"],
+                "revision": entities.revision_of(block["props"]) if (tracked and block) else None,
+                "snoozeUntil": (block["props"].get("PM_SNOOZE_UNTIL") or None) if block else None,
+                "text": entry["text"],
+                "line": entry["line"],
+                "capturedAt": entry.get("capturedAt"),
+                "source": entry.get("source"),
+                "projectHint": entry.get("projectHint"),
+                "annotationCount": entry.get("annotationCount"),
+                "revisionCount": entry.get("revisionCount"),
+                "lastAnnotationText": entry.get("lastAnnotationText"),
+                "annotations": entry.get("annotations", []),
+                "pinned": bool(entry.get("pinned")),
+                "origin": row["origin"],
+                "file": row["name"],
+            }
+            if wanted_origin and row["origin"] != wanted_origin:
+                continue
+            if wanted is None or item["status"].upper() == wanted:
+                entries.append(item)
+    return {
+        "path": inbox.INBOX_RELATIVE,
+        "count": len(entries),
+        "files": file_rows,
+        "counts": {
+            "human": sum(row["count"] for row in file_rows if row["origin"] == "human"),
+            "ai": sum(row["count"] for row in file_rows if row["origin"] == "ai"),
+        },
+        "entries": entries,
+    }
+

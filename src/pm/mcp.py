@@ -412,6 +412,7 @@ def capture_text(
     now: datetime | None = None,
     actor: str | None = None,
     idempotency_key: str | None = None,
+    inbox_modes=None,
 ) -> CaptureResult:
     """向库根的 inbox.org **追加**一条快速笔记（绝不改写已有内容）。
 
@@ -420,7 +421,12 @@ def capture_text(
     """
     captured = now or datetime.now().astimezone()
     inbox_id = _new_capture_id(captured)
-    path = Layout(library_root).inbox
+    from pm import inbox_files
+    origin = "ai" if str(source) == "mcp" else "human"
+    path = inbox_files.path_for_origin(origin, Path(library_root), captured, inbox_modes)
+    _modes = inbox_files.modes_of(inbox_modes)
+    if (_modes.human if origin == "human" else _modes.ai) != "single":
+        inbox_files.ensure_file(path, origin)
     headline, properties, body_lines = _capture_parts(
         text, title=title, source=source, model=model,
         project_hint=project_hint, captured=captured,
@@ -459,6 +465,7 @@ def plan_capture(
     project_hint: str | None = None,
     now: datetime | None = None,
     actor: str | None = None,
+    inbox_modes=None,
 ) -> CapturePlan:
     """预演一次 capture：算出文件/行号/块内容/将用的 ID 与审计事件，**绝不写任何字节**。
 
@@ -467,7 +474,9 @@ def plan_capture(
     """
     captured = now or datetime.now().astimezone()
     inbox_id = _new_capture_id(captured)
-    path = Layout(library_root).inbox
+    from pm import inbox_files
+    origin = "ai" if str(source) == "mcp" else "human"
+    path = inbox_files.path_for_origin(origin, Path(library_root), captured, inbox_modes)
     headline, properties, body_lines = _capture_parts(
         text, title=title, source=source, model=model,
         project_hint=project_hint, captured=captured,
@@ -496,6 +505,7 @@ def tool_capture(svc: Service, args: dict[str, Any]) -> str:
         title=title,
         source="mcp",
         model=str(args.get("model") or "mcp"),
+        inbox_modes=svc.config.inbox.modes(),
     )
     note = "" if result.found_section else "（没找到 * Inbox 小节，已追加到文件末尾）"
     return (

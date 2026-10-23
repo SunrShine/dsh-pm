@@ -196,6 +196,25 @@ class GenerateConfig:
 
 
 @dataclass(frozen=True)
+class InboxConfig:
+    """`[inbox]`：多文件 inbox 的轮转粒度（用户 2026-10-22 裁定）。
+
+    真源按来源分文件：inbox-human-<period>.org / inbox-ai-<period>.org；inbox.org 是生成视图。
+    默认：人工 weekly、AI monthly（旧库不配置也能跑，见 pm.inbox_files）。
+    """
+
+    #: 人工文件粒度：weekly | monthly | quarterly | yearly | single | per-entry
+    #: 默认 single = 保持旧库「单文件 inbox.org」行为；多文件请在 pm.toml 显式写 [inbox]
+    human_mode: str = "single"
+    #: AI/MCP 文件粒度：monthly | quarterly | yearly | single
+    ai_mode: str = "single"
+
+    def modes(self):
+        from pm import inbox_files
+        return inbox_files.InboxModes(human=self.human_mode, ai=self.ai_mode)
+
+
+@dataclass(frozen=True)
 class Config:
     #: 临时单实例覆盖（--dsh-home）。为 None 时走 instances 或自动发现。
     dsh_home: Path | None = None
@@ -218,6 +237,8 @@ class Config:
     hooks: HooksConfig = HooksConfig()
     #: 记忆生成命令（[memory.generate]）：LLM 出口 + 预算（默认零出网）
     generate: GenerateConfig = GenerateConfig()
+    #: 多文件 inbox 的轮转粒度（[inbox]）
+    inbox: InboxConfig = InboxConfig()
     source_path: Path | None = None
 
     @property
@@ -413,6 +434,25 @@ def _parse_hooks(section, path: Path | None) -> HooksConfig:
     )
 
 
+def _parse_inbox(section, path: Path | None) -> InboxConfig:
+    """解析 `[inbox]`；非法值 → CONFIG_INVALID 硬失败（不猜）。"""
+    if section is None:
+        return InboxConfig()
+    if not isinstance(section, dict):
+        raise ConfigPathError("CONFIG_INVALID", str(path or "pm.toml") + " 的 [inbox] 必须是一个表（table）")
+    from pm import inbox_files
+    human = str(section.get("human_mode", InboxConfig.human_mode)).strip().lower()
+    ai = str(section.get("ai_mode", InboxConfig.ai_mode)).strip().lower()
+    if human not in inbox_files.HUMAN_MODES:
+        raise ConfigPathError("CONFIG_INVALID", "[inbox].human_mode 必须是 " + "/".join(inbox_files.HUMAN_MODES) + "，收到 " + repr(human))
+    if ai not in inbox_files.AI_MODES:
+        raise ConfigPathError("CONFIG_INVALID", "[inbox].ai_mode 必须是 " + "/".join(inbox_files.AI_MODES) + "，收到 " + repr(ai))
+    unknown = sorted(set(section) - {"human_mode", "ai_mode"})
+    if unknown:
+        raise ConfigPathError("CONFIG_INVALID", "[inbox] 不认识的键：" + ", ".join(unknown))
+    return InboxConfig(human_mode=human, ai_mode=ai)
+
+
 def load(explicit: str | None = None) -> tuple[Config, list[str]]:
     """加载配置；缺失即使用内置默认值（自动发现数据根），绝不因为配置缺失而失败。"""
     warnings: list[str] = []
@@ -471,6 +511,7 @@ def load(explicit: str | None = None) -> tuple[Config, list[str]]:
     exclude = raw.get("exclude_paths")
     row_limit = raw.get("row_limit")
     hooks = _parse_hooks(raw.get("hooks"), path)
+    inbox_cfg = _parse_inbox(raw.get("inbox"), path)
     generate = _parse_generate(raw.get("memory"), path)
 
     return (
@@ -488,6 +529,7 @@ def load(explicit: str | None = None) -> tuple[Config, list[str]]:
             row_limit=int(row_limit) if isinstance(row_limit, int) and row_limit >= 0 else 8,
             hooks=hooks,
             generate=generate,
+            inbox=inbox_cfg,
             source_path=path,
         ),
         warnings,

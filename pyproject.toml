@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dsh-pm"
-version = "0.3.1"
+version = "0.3.2"
 description = "DSH → Org 工作记忆：把 DSH 的工作区 / 会话状态投影成项目 / 任务 / 随手记 / 提案 / 记忆"
 readme = "README.md"
 requires-python = ">=3.11"

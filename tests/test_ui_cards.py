@@ -291,9 +291,11 @@ class UiCardsCommandTest(unittest.TestCase):
             {
                 "path": "inbox.org",
                 "count": 2,
+                "files": [{"path": "inbox.org", "origin": "human", "count": 2, "legacy": True}],
+                "counts": {"human": 2, "ai": 0},
                 "entries": [
-                    {"text": "甲", "line": 6, "id": None, "status": "LEGACY_UNTRACKED", "capturedAt": None, "source": None, "projectHint": None, "annotationCount": None, "revisionCount": None, "lastAnnotationText": None, "pinned": False},
-                    {"text": "乙", "line": 7, "id": None, "status": "LEGACY_UNTRACKED", "capturedAt": None, "source": None, "projectHint": None, "annotationCount": None, "revisionCount": None, "lastAnnotationText": None, "pinned": False},
+                    {"text": "甲", "line": 6, "id": None, "status": "LEGACY_UNTRACKED", "capturedAt": None, "source": None, "projectHint": None, "annotationCount": None, "revisionCount": None, "lastAnnotationText": None, "pinned": False, "origin": "human", "file": "inbox.org"},
+                    {"text": "乙", "line": 7, "id": None, "status": "LEGACY_UNTRACKED", "capturedAt": None, "source": None, "projectHint": None, "annotationCount": None, "revisionCount": None, "lastAnnotationText": None, "pinned": False, "origin": "human", "file": "inbox.org"},
                 ],
             },
         )
@@ -359,7 +361,7 @@ class InboxParseTest(unittest.TestCase):
             root = Path(tmp)
             (root / "inbox.org").write_text("", encoding="utf-8")
             payload = read_inbox(root)
-        self.assertEqual(payload, {"path": "inbox.org", "count": 0, "entries": []})
+        self.assertEqual(payload, {"path": "inbox.org", "count": 0, "files": [], "counts": {"human": 0, "ai": 0}, "entries": []})
 
     def test_invalid_utf8_returns_null_without_raising(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

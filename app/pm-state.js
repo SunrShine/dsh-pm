@@ -19,6 +19,7 @@ export var state = {
     q: '',                  // 收件箱搜索（客户端）
     inbox: null,            // {source:'endpoint'|'cards', path, count, entries, status, error}
     inboxStatus: '',        // 状态过滤（真实端点参数）
+    inboxOrigin: '',        // 来源过滤（客户端）：'' = 全部 / 'human' / 'ai'
     inboxDetail: null,      // {id, data:{id,revision,status,text,annotations[],revisions[]}, error}
     busy: false,            // 写命令进行中
     credential: null,       // 最近一次成功写命令的 §5 凭据

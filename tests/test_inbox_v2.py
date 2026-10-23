@@ -79,12 +79,16 @@ class InboxV2Test(unittest.TestCase):
             (root / "inbox.org").write_text(doc_for("一条"), encoding="utf-8")
             payload = read_inbox(root)
         assert payload is not None
-        self.assertEqual(set(payload), {"path", "count", "entries"})
+        # 多文件 inbox（2026-10-22）起：旧字段全保留，另加 files/counts 与每条 origin/file
+        self.assertTrue({"path", "count", "entries"} <= set(payload))
+        self.assertEqual(set(payload["files"][0]), {"path", "origin", "count", "legacy"})
+        self.assertEqual(set(payload["counts"]), {"human", "ai"})
         self.assertEqual(
             set(payload["entries"][0]),
             {
                 "text", "line", "id", "status", "capturedAt", "source", "projectHint",
                 "annotationCount", "revisionCount", "lastAnnotationText", "pinned",
+                "origin", "file",
             },
         )
         self.assertEqual(payload["count"], 1)

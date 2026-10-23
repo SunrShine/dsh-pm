@@ -40,7 +40,7 @@ dsh-pm treats sessions strictly as **read-only input** and distils them into "wo
 - The internal design / convention / acceptance / memo records are **not published with the repository**, so this README never links to them; where they are mentioned, they are called "internal records (not published)" together with the command and the date.
 - The skills shipped to agents: [skill/pm/SKILL.md](skill/pm/SKILL.md); the details of each skill live next to it under `references/` (loaded on demand instead of bloating the main file).
 
-> Status: **v0.2 series**, repository currently **private** (cloning / installing requires an account with access).
+> Status: **v0.3 series** (latest release **v0.3.1**, 2026-10-22); the repository is **public** at [github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm).
 > Anything unfinished is listed under [roadmap / not done](#roadmap--not-done) at the end — never written up as done.
 
 ## UI
@@ -150,15 +150,26 @@ dsh plugin add github:SunrShine/dsh-pm
 |---|---|---|---|
 | **Project** | A unit that can be composed of several DSH workspaces | `projects/proj-<key>/project.org` (human) | Identity is `:ID:`; the brief has six sections: goal / scope / non-goals / acceptance criteria / milestones / risks |
 | **Task** | A concrete piece of work with acceptance criteria | `projects/proj-<key>/tasks.org` | `TODO → NEXT → DOING → REVIEW → DONE`; `DONE` **only a human writes**, AI stops at `REVIEW` |
-| **Quick note (inbox)** | Jot one line down first, triage later | `inbox.org` | `CAPTURED → TRIAGE → TASK_PROPOSED → TASK_CREATED`; archive/snooze/merge/dismiss/save-as-note; **the original text is read-only**, addenda are appended and revisions keep the old value |
+| **Quick note (inbox)** | Jot one line down first, triage later | `inbox-human-<period>.org` / `inbox-ai-<period>.org` (human weekly / AI monthly); `inbox.org` is a generated view | `CAPTURED → TRIAGE → TASK_PROPOSED → TASK_CREATED`; archive/snooze/merge/dismiss/save-as-note; **archiving is time rotation, not file movement** (the status stays in the entry's own period file); **the original text is read-only**, addenda are appended and revisions keep the old value |
 | **Proposal** | An AI plan waiting for human approval | `proposals.org` | `PENDING → APPROVED / REJECTED`; **an unapproved proposal never creates a real task** |
 | **Memory** | Facts / decisions / gotchas an AI may use as context | `memory/{facts,decisions,gotchas}.org` + `memory-candidates.org` | `CANDIDATE → VERIFIED` (**only a human** can verify) → `DEPRECATED` (history kept) |
 | **Work card** | A read-only snapshot of one DSH session | Not persisted (output of `pm scan` / `ui-cards`) | Says what the cache recorded, never that a session is running (see the [honesty contract](#honesty-contract)) |
 
 > **Memory is flat by decision (2026-10-18).** Memories are separated only by **status** (`CANDIDATE → VERIFIED → DEPRECATED`)
 > and **type** (fact / decision / gotcha), all maintained by hand; the `L1/L2/L3` layer field is a **reserved capability**
-> — present in the code, not shown in the UI, not used day to day ([`docs/13`](docs/13-记忆分层：存储、索引与生成流程.md)).
+> — present in the code, not shown in the UI, not used day to day ([`内部记录（未随仓库发布）)).
 > So don't delete it as dead code, and don't wire it into the UI or the injection path without a new decision.
+
+> **The inbox is split by origin and rotates by time (2026-10-22).** The sources of truth are
+> `inbox-human-<period>.org` (human writes, default **weekly**, e.g. `inbox-human-2026-W43.org`) and
+> `inbox-ai-<period>.org` (AI / MCP writes, default **monthly**, e.g. `inbox-ai-2026-10.org`).
+> `inbox.org` is an **auto-generated summary view (read-only)**: the current human + AI files inlined, older periods listed as links only;
+> `pm inbox render` writes it and `pm inbox render --check` verifies it (a stale view exits 1).
+> **Archiving is time rotation, not file movement**: a processed entry keeps its status (`ARCHIVED` / `TASK_CREATED` / …) in the period file where it was written,
+> so "what happened in week 43" stays in `inbox-human-2026-W43.org`.
+> An old library keeps its single `inbox.org`; `pm inbox migrate` (`--dry-run` by default, `--write` backs the file up first) splits it by origin and period.
+> The rotation granularity is `[inbox] human_mode` / `ai_mode` in `pm.toml`: the code default is `single` (an old library keeps working unchanged), and the real library used for verification is configured as `weekly` / `monthly`.
+> Audit trail and CAS are untouched by the split: an entry is still addressed by `:ID:`, and the write lands in whichever file currently holds it.
 
 Every **write** goes through the same path (`entities.apply_change`): check the revision first (CAS, so nobody else's edit is overwritten),
 replace the whole file atomically, record an audit entry on the item, and write only once when the same submission is repeated; a revision mismatch returns `exit 3` and writes not a single byte.
@@ -190,10 +201,10 @@ role = "explore"
 
 ## Commands and interfaces
 
-### CLI (measured from `./bin/pm --help`, 2026-10-12)
+### CLI (measured from `./bin/pm --help`, 2026-10-23)
 
-16 top-level commands: `scan`, `ui-cards`, `api`, `init`, `render`, `summary`, `log`, `capture`,
-`inbox`, `task`, `proposal`, `memory`, `project`, `workspace`, `mcp`, `skill`.
+20 top-level commands: `scan`, `ui-cards`, `api`, `init`, `render`, `summary`, `log`, `capture`,
+`inbox`, `task`, `proposal`, `memory`, `project`, `workspace`, `index`, `recall`, `hook`, `prompt`, `mcp`, `skill`.
 
 | Command | Common subcommands | What it does |
 |---|---|---|
@@ -203,9 +214,14 @@ role = "explore"
 | `pm init` / `pm render` | `--root`, `--write`, `--dry-run` | Create the library skeleton / generate `generated/**` (dry-run by default) |
 | `pm summary` | `queue`, `set` | Work-card summaries (a human summary wins; AI never overwrites it) |
 | `pm log` | `--session`, `--project --missing` | Read session logs and distil material (print only) |
-| `pm capture` | `--project`, `--title`, `--json` | Append a quick note to `inbox.org` |
-| `pm inbox` | `list/archive/snooze/merge/note/dismiss/set-status/annotate/edit/history/pin/unpin` | Inbox: triage + append addenda + explicit revision (old value kept) + history + pinning |
-| `pm task` | `list/show/create/transition/check/dag/import-team/execution-config/link-session/unlink-session/handoff` | Tasks, acceptance-criteria ticking, DAG, AI execution config and handoff (**no dispatch**) |
+| `pm capture` | `--project`, `--json`, `--dry-run` | Append a quick note; **routed by origin**: CLI (human) → `inbox-human-<period>.org`, MCP/AI → `inbox-ai-<period>.org` |
+| `pm inbox files` | `--json` | List the inbox source files (human / AI rotation files, plus a legacy single `inbox.org` if the library has not been migrated) |
+| `pm inbox render` | `--check`, `--json` | Generate the read-only `inbox.org` summary view; `--check` only verifies it (stale → exit 1, nothing written) |
+| `pm inbox migrate` | `--write`, `--json` | Split an old single `inbox.org` by origin/period (**dry-run by default**; `--write` backs up the old file first, then regenerates the view) |
+| `pm inbox` (triage) | `list` (`--status`, `--origin human\|ai`) `/ archive/snooze/merge/note/dismiss/set-status/annotate/edit/history/pin/unpin` | Inbox: triage + append addenda + explicit revision (old value kept) + history + pinning; every action addresses the entry by `:ID:` and writes into the file that currently holds it |
+| `pm index` / `pm recall` | `--rebuild`, `--dry-run` / `--query`, `--scope`, `--type`, `--limit` | Memory content index (derived, `<library>/.local/index.sqlite`) / recall with the default scope (VERIFIED only) |
+| `pm hook` / `pm prompt` | `session-start`, `recall`, `install` / `get`, `list`, `set`, `exports` | DSH hook injection (read-only, budgeted, off with one switch) / per-project initial prompt data (CAS + audit) |
+| `pm task` | `list/show/create/transition/check/evidence/criteria/init-ids/dag/import-team/execution-config/link-session/unlink-session/handoff` | Tasks, acceptance-criteria ticking + stable criterion IDs, evidence, DAG, AI execution config and handoff (**no dispatch**) |
 | `pm proposal` | `list/show/create/approve/reject/revise` | Proposals: only approval creates tasks; revising keeps the id and re-anchors the source revision |
 | `pm memory` | `candidates/list/context/add/verify/deprecate/discard` — plus the **reserved** layer commands `scene/extract/condense/distill/stale` | Candidate → human verification → context bundle (VERIFIED only); the reserved five belong to the L1–L3 layer capability (see the note under Core concepts) |
 | `pm project` | `list/create/context/brief get/brief set` | Unified project list, scaffold a directory, project brief (read / explicitly rewrite one section) |
@@ -222,9 +238,9 @@ plus 4 `UNSUPPORTED_ENDPOINTS`**; source: internal frontend review records, not 
 |---|---|
 | Cards / host | `GET /ui-pm/cards`, `GET /ui-pm/capabilities`, `GET /ui-pm/events`, `POST /ui-pm/capture` |
 | Inbox | `GET /ui-pm/inbox`, `GET /ui-pm/inbox/:id`, `POST /ui-pm/inbox/:id/{archive,snooze,merge,note,dismiss,annotate,edit,pin,unpin}` |
-| Tasks | `GET /ui-pm/tasks`, `GET /ui-pm/tasks/:id`, `GET|POST /ui-pm/tasks/:id/execution-config`, `POST /ui-pm/tasks/:id/{link-session,unlink-session}`, `GET /ui-pm/tasks/:id/handoff` |
+| Tasks | `GET /ui-pm/tasks`, `GET /ui-pm/tasks/:id`, `GET\|POST /ui-pm/tasks/:id/execution-config`, `POST /ui-pm/tasks/:id/{link-session,unlink-session}`, `GET /ui-pm/tasks/:id/handoff` |
 | Proposals | `GET /ui-pm/proposals`, `GET /ui-pm/proposals/:id`, `POST /ui-pm/proposals/:id/{approve,reject,revise}` |
-| Projects / workspaces | `GET|POST /ui-pm/projects`, `GET /ui-pm/projects/:id/context`, `GET|POST /ui-pm/projects/:key/brief`, `GET /ui-pm/workspaces`, `GET /ui-pm/workspaces/context` |
+| Projects / workspaces | `GET\|POST /ui-pm/projects`, `GET /ui-pm/projects/:id/context`, `GET\|POST /ui-pm/projects/:key/brief`, `GET /ui-pm/workspaces`, `GET /ui-pm/workspaces/context` |
 | Memory | `GET /ui-pm/memory`, `POST /ui-pm/memory/:id/deprecate`, `POST /ui-pm/memory-candidates/:id/{verify,merge,discard}` |
 | **Not implemented (explicitly rejected)** | `POST /ui-pm/tasks/:id/dispatch`, `submit-review`, `accept`, `return` (4 entries in `UNSUPPORTED_ENDPOINTS` with reasons; see [roadmap](#roadmap--not-done)) |
 
@@ -234,13 +250,13 @@ a revision mismatch → `409` (`exit 3` in the CLI).
 
 ### MCP tools (`pm mcp`, stdio)
 
-10 tools (measured from `TOOLS` in `src/pm/mcp.py`, 2026-10-12):
+11 tools (measured from `TOOLS` in `src/pm/mcp.py`, 2026-10-23):
 `projects`, `cards`, `card`, `summary_queue`, `session_log`, `set_summary`, `capture`,
-`task_add`, `proposal_draft`, `render`.
+`pm_recall`, `task_add`, `proposal_draft`, `render`.
 
 - `task_add` can only create `TODO`/`NEXT`: writing `DONE`/`CANCELLED` is explicitly rejected (`DONE_REQUIRES_HUMAN`).
 - `proposal_draft` **only creates a proposal, never a real task** (stated in the tool description).
-- `capture` also returns those five fields and records an audit entry.
+- `capture` also returns those five fields and records an audit entry; because it runs as MCP (`source=mcp`) it appends to the **AI** inbox file (`inbox-ai-<period>.org`), never to the human one.
 
 ## Honesty contract
 
@@ -255,6 +271,7 @@ This is where the project spends most of its effort: **rather write "I do not kn
 7. **Write gate and report-only deletion**: without an explicit `--config`, a write command must carry `--yes`; `pm render` is dry-run by default and only `--write` persists; files under `generated/` that are no longer part of this plan are marked `orphan` and **only reported, never deleted** (auto-deleting when a data source is temporarily unavailable would destroy rebuildability). **Conversation bodies are not printed by default**: text coming from prompts requires an explicit `--show-prompt`.
 8. **Fake-green protection** (guarding not the features but "verification itself lying"):
    - `scripts/verify-dsh-plugin.sh` fingerprints `inbox.org`, `overrides.org` and `projects/**` (file set + per-file sha256) at the start and end of acceptance; any change/addition/deletion FAILs; `--self-test-human-guard` proves on a temporary copy that this line **really does FAIL**.
+     **Known gap**: the fingerprint still names the single `inbox.org`, so after the multi-file split the human truth in `inbox-human-*.org` is **not** covered by it yet (see [roadmap](#roadmap--not-done)); do not read a PASS as "the human inbox was not touched".
    - Harness injection (stubbing the frontend) must have hard-assertion anchors; silent no-ops are forbidden, and the guard itself ships negative self-tests (born from a real fake-green incident).
    - A broken domain module (ImportError/SyntaxError) must not stop the whole CLI; the other domains still register.
 9. **Read-only originals + append-only addenda + explicit revision**: a captured quick note is never rewritten in place; addenda are appended to the body (with actor/time/rev); when a rewrite is genuinely needed it goes through `pm inbox edit --reason`, and **the old value stays verbatim in the entry**.
@@ -276,7 +293,8 @@ This is where the project spends most of its effort: **rather write "I do not kn
                      │
                      ▼
    ┌──────────────────────── work-memory library (Org is the single source of truth) ────────┐
-   │ inbox.org │ projects/proj-*/{project,tasks,memory}.org │ proposals.org │ memory/*.org │
+   │ inbox-human-*.org + inbox-ai-*.org (+ generated inbox.org) │ projects/proj-*/{project,tasks,memory}.org │
+   │ proposals.org │ memory/*.org │
    └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                             │  entities.apply_change (revision check + atomic write + audit + dedup)
                                             ▼
@@ -302,7 +320,8 @@ src/pm/
   scan.py                   grouping, filtering, sorting
   sources/                  read-only layer over ~/.dsh*/storages
   entities.py               the common implementation of every write (revision check + atomic write + audit + dedup)
-  inbox.py / inbox_ops.py   inbox parsing and actions (triage / addendum / revision / pin)
+  inbox.py / inbox_ops.py   inbox parsing and actions (triage / addendum / revision / pin), across all inbox files
+  inbox_files.py            inbox file layout: per-origin/per-period naming, aggregation, the generated view, migration
   tasks.py                  task model (state machine / acceptance criteria / DAG / import-team)
   proposals.py              proposal model (create / approve / reject / revise)
   memory.py                 memory candidate → VERIFIED → context bundle
@@ -374,15 +393,17 @@ The other `scripts/verify_*.py` either read code only or verify against a tempor
 |---|---|---|
 | UI screenshots | **Done (demo library)** | Captured from a self-built demo library `~/dsh-pm-demo` (pure fake data; no real project names/paths/session ids); reproduce with the commands in [UI](#ui) |
 | One static check in the acceptance script mis-firing | **Being fixed** | The single FAIL in the gate is the check itself being too rigid (anchor matching), not a functional defect |
+| Human-file fingerprint vs. the multi-file inbox | **Planned** | `scripts/verify-dsh-plugin.sh` (C15) still fingerprints only `inbox.org`; the human inbox truth is now `inbox-human-*.org` / `inbox-ai-*.org`, which the fingerprint does not watch yet |
 | DSH dispatch (who executes a task; including dedup and retry) | **Not implemented** | `POST /ui-pm/tasks/:id/dispatch` sits in `UNSUPPORTED_ENDPOINTS`; execution config only has "not ready" (`NOT_READY`) / "ready for handoff" (`HANDOFF_READY`) and never pretends to have dispatched |
 | Dedicated `submit-review` / `accept` / `return` commands | **Not implemented** | `pm task transition` + `actor=human` is the equivalent today |
-| Task change history (reading the `:LOGBOOK:` trail) + a detail view | **Planned** | Scheduled internally |
-| Task evidence (screenshots / links), AI self-assessment, event timeline, stable IDs for acceptance criteria | **Planned** | Internal implementation records list them as "not done yet"; a source search while writing this README found no implementation |
+| Task change history (reading the `:LOGBOOK:` trail) + a detail view | **Done** | `pm task show --json` returns `history` / `historyCount` / `historyTruncated`, and the task detail pane renders it (newest first; missing fields read "not recorded") |
+| Task evidence (screenshots / links) and stable IDs for acceptance criteria | **Done** | `pm task evidence add/list` (kind / result, `info` when unknown) and `pm task criteria init-ids` (backfills `c-xxxx` IDs) |
+| AI self-assessment + an aggregated event timeline | **Planned** | Still internal-design-only |
 | Frontend JS module split (phase 2) + tests no longer reading source text | **In progress** | That static check currently reports the FAIL |
 | Replacing drag/scroll with a third-party library | **Under evaluation** | Drag-and-drop and horizontal scrolling are home-grown (and usable); whether to switch is being evaluated |
 | End-to-end re-verification of plugin installation | **In progress** | Installation goes through GitHub (above); a clean-profile re-verification is unfinished |
 | `pipx` / PyPI publishing | **Planned** | `pipx install git+https://github.com/SunrShine/dsh-pm` is the target form; PyPI is not published |
-| `pm.el` (an Emacs org-agenda / capture entry point) | **Planned** | Exists only in internal design; no implementation file in the repository |
+| `pm.el` (an Emacs org-agenda / capture entry point) | **Available** (repo root `pm.el`) | Left sidebar entry, agenda files, `C-c a P`, and a multi-file-aware org-capture template (writes the current `inbox-human-*.org` with `:ID:`); also `pm-capture-inbox` / `pm-inbox-render` / `pm-inbox-open-current` (see `emacs/README.md`) |
 | Contributor agreement, CI workflow | **To be added** | The licence is settled as MIT (below) |
 | Compatibility range with other DSH versions | **TODO** | So far only verified against `0.2.1-alpha.x` |
 

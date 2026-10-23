@@ -63,6 +63,10 @@ SCOPE_GLOBAL = "global"
 
 #: 记忆分层（内部记录/13 §2）：L1 条目一目一条、L2 一场景一文件、L3 一份常驻准则。
 #: 候选区用 :PM_LAYER: 标明它最终属于哪一层；缺省按 L1（现有候选取值）。
+#:
+#: ★ 状态（2026-10-18，方案 A）：**预留能力** —— 界面不暴露、日常不启用，但**代码与口径保留**。
+#:   L1 是默认层且**不写属性**（Org 逐字节不变，见下 to_properties）。别因为"界面上看不到"就当废码删除；
+#:   也别顺手把 layer 接到 UI/注入里（那是行为变更）。边界与启用触发条件见 内部记录/13 顶部「当前状态」块。
 LAYER_L1 = "L1"
 LAYER_L2 = "L2"
 LAYER_L3 = "L3"
@@ -1567,7 +1571,13 @@ def command_scene_set(args) -> int:
 
 def register_cli(subparsers) -> None:
     """把自己的子命令挂到 pm 的 subparsers 上（cli.py 的 _register_domain_commands 调它）。"""
-    memory = subparsers.add_parser("memory", help="记忆：候选 → 人工确认 → 上下文包（设计 §5.4）")
+    memory = subparsers.add_parser(
+        "memory",
+        help="记忆：候选 → 人工确认 → 上下文包（设计 §5.4）；三类 fact/decision/gotcha",
+        description="记忆：候选 →（人确认）→ 正式 →（可选）废弃。"
+                    " 分层 L1/L2/L3 是**预留能力**（界面不暴露、日常不启用）："
+                    "scene/extract/condense/distill/stale 保留可用，边界见 内部记录/13 顶部「当前状态」。",
+    )
     sub = memory.add_subparsers(dest="memory_command")
 
     candidates = sub.add_parser("candidates", help="列出记忆候选（AI/系统提出，未确认）")

@@ -40,7 +40,7 @@ dsh-pm 只把会话当**只读输入**，整理成一张张「工作卡」；而
 - 设计与验收的细节记录属于**内部资料，未随仓库发布**；正文里凡引用它们的地方，都写成「内部记录（未随仓库发布）」并给出命令与日期。
 - 给 agent 的 skill（随仓库分发）：[skill/pm/SKILL.md](skill/pm/SKILL.md)；每份 skill 的细节放在相邻的 `references/` 里（按需加载，不塞进主文件）。
 
-> 状态：**v0.2 系列**，仓库当前为 **private**（clone / 安装需要账号有访问权限）。
+> 状态：**v0.3 系列**（最新发布 **v0.3.1**，2026-10-22）；仓库已**公开**：[github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm)。
 > 未完成的东西一律放在文末[路线 / 未完成](#路线--未完成)，不写成已完成。
 
 ## 界面
@@ -156,16 +156,26 @@ dsh plugin add github:SunrShine/dsh-pm
 |---|---|---|---|
 | **项目** | 一个可由多个 DSH 工作区组成的单元 | `projects/proj-<key>/project.org`（人工） | 身份看 `:ID:`；简报六段：目标 / 范围 / 非目标 / 验收标准 / 里程碑 / 风险 |
 | **任务** | 要做的具体事，带验收标准 | `projects/proj-<key>/tasks.org` | `TODO → NEXT → DOING → REVIEW → DONE`；`DONE` **只能由人写**，AI 只能到 `REVIEW` |
-| **随手记（inbox）** | 一句话先记下来，之后再分流 | `inbox.org` | `CAPTURED → TRIAGE → TASK_PROPOSED → TASK_CREATED`；归档/延期/合并/丢弃/存为笔记；**原文只读**，补充是追加、修订记旧值 |
+| **随手记（inbox）** | 一句话先记下来，之后再分流 | `inbox-human-<周期>.org` / `inbox-ai-<周期>.org`（人工按周 / AI 按月）；`inbox.org` 是生成视图 | `CAPTURED → TRIAGE → TASK_PROPOSED → TASK_CREATED`；归档/延期/合并/丢弃/存为笔记；**归档=时间轮转，不搬文件**（状态留在条目所在的周期文件里）；**原文只读**，补充是追加、修订记旧值 |
 | **提案（proposal）** | AI 的计划，等人批准 | `proposals.org` | `PENDING → APPROVED / REJECTED`；**未批准的提案绝不创建正式任务** |
 | **记忆（memory）** | 事实 / 决策 / 坑，可被 AI 当上下文 | `memory/{facts,decisions,gotchas}.org` + `memory-candidates.org` | `CANDIDATE → VERIFIED`（**只有人**能 verify）→ `DEPRECATED`（保留历史） |
 | **工作卡（card）** | 一次 DSH 会话的只读写照 | 不落盘（`pm scan` / `ui-cards` 的输出） | 只说明缓存里记了什么，不代表正在跑（见[诚实契约](#诚实契约)） |
 
 > **记忆是扁平的（2026-10-18 定为决定）。** 记忆之间只按**状态**（`CANDIDATE → VERIFIED → DEPRECATED`）
 > 与**类型**（事实 / 决策 / 坑）区分，全部由人手工维护；`L1/L2/L3` 分层字段是**保留能力** ——
-> 代码里有、界面不显示、日常不用（见 [`docs/13`](docs/13-记忆分层：存储、索引与生成流程.md)）。
+> 代码里有、界面不显示、日常不用（见 [`内部记录（未随仓库发布）)）。
 > 所以：别把它当死代码删掉，也别在没有新决定的情况下把它接进界面或注入链路。
 
+
+> **收件箱按来源分文件、按时间轮转（2026-10-22）。** 真源是 `inbox-human-<周期>.org`（人工写入，默认**按周**，如 `inbox-human-2026-W43.org`）
+> 与 `inbox-ai-<周期>.org`（AI / MCP 写入，默认**按月**，如 `inbox-ai-2026-10.org`）。
+> `inbox.org` 是**自动生成的汇总视图（只读）**：当前人工 + AI 文件内联，历史周期只列链接；
+> `pm inbox render` 生成它，`pm inbox render --check` 校验它（过期则 exit 1）。
+> **归档=时间轮转，不搬文件**：处理完的条目把状态（`ARCHIVED` / `TASK_CREATED` / …）留在它被写入的那个周期文件里，
+> 所以「第 43 周发生了什么」仍然在 `inbox-human-2026-W43.org` 里。
+> 旧库继续用单文件 `inbox.org`；`pm inbox migrate`（默认 `--dry-run`，加 `--write` 会先备份旧文件）按来源与周期拆分它。
+> 轮转粒度是 `pm.toml` 的 `[inbox] human_mode` / `ai_mode`：代码默认 `single`（旧库原样可用），本机验证用的真实库配的是 `weekly` / `monthly`。
+> 拆分不动审计与 CAS：条目仍按 `:ID:` 寻址，写入落在**当前装着它的那个文件**里。
 
 所有**写入**都走同一条路（`entities.apply_change`）：先核对版本号（CAS，避免覆盖别人的修改）、
 整文件原子替换、在条目里记一条审计、支持重复提交时只写一次；版本对不上就报 `exit 3`，一个字节都不落。
@@ -199,10 +209,10 @@ role = "explore"
 
 ## 命令与接口
 
-### CLI（实测 `./bin/pm --help`，2026-10-12）
+### CLI（实测 `./bin/pm --help`，2026-10-23）
 
-顶层 16 个命令：`scan`、`ui-cards`、`api`、`init`、`render`、`summary`、`log`、`capture`、
-`inbox`、`task`、`proposal`、`memory`、`project`、`workspace`、`mcp`、`skill`。
+顶层 20 个命令：`scan`、`ui-cards`、`api`、`init`、`render`、`summary`、`log`、`capture`、
+`inbox`、`task`、`proposal`、`memory`、`project`、`workspace`、`index`、`recall`、`hook`、`prompt`、`mcp`、`skill`。
 
 | 命令 | 常用子命令 | 说明 |
 |---|---|---|
@@ -212,9 +222,14 @@ role = "explore"
 | `pm init` / `pm render` | `--root`、`--write`、`--dry-run` | 建库骨架 / 生成 `generated/**`（默认干跑） |
 | `pm summary` | `queue`、`set` | 工作卡摘要（人工摘要优先，AI 不覆盖） |
 | `pm log` | `--session`、`--project --missing` | 读会话日志提炼材料（只打印） |
-| `pm capture` | `--project`、`--title`、`--json` | 往 `inbox.org` 追加一条随手记 |
-| `pm inbox` | `list/archive/snooze/merge/note/dismiss/set-status/annotate/edit/history/pin/unpin` | 收件箱：分流 + 追加补充 + 显式修订（记旧值）+ 历史 + 置顶 |
-| `pm task` | `list/show/create/transition/check/dag/import-team/execution-config/link-session/unlink-session/handoff` | 任务、验收标准勾选、DAG、AI 执行配置与 handoff（**不派发**） |
+| `pm capture` | `--project`、`--json`、`--dry-run` | 追加一条随手记；**按来源路由**：CLI（人工）→ `inbox-human-<周期>.org`，MCP/AI → `inbox-ai-<周期>.org` |
+| `pm inbox files` | `--json` | 列出收件箱真源文件（人工 / AI 轮转文件；库没迁移时还会有旧单文件 `inbox.org`） |
+| `pm inbox render` | `--check`、`--json` | 生成只读的 `inbox.org` 汇总视图；`--check` 只校验（过期 → exit 1，不写） |
+| `pm inbox migrate` | `--write`、`--json` | 把旧单文件 `inbox.org` 按来源/周期拆开（**默认 dry-run**；`--write` 先备份旧文件，再重生成视图） |
+| `pm inbox`（分流） | `list`（`--status`、`--origin human\|ai`） `/ archive/snooze/merge/note/dismiss/set-status/annotate/edit/history/pin/unpin` | 收件箱：分流 + 追加补充 + 显式修订（记旧值）+ 历史 + 置顶；每个动作都按 `:ID:` 寻址，写入落在当前装着它的那个文件 |
+| `pm index` / `pm recall` | `--rebuild`、`--dry-run` / `--query`、`--scope`、`--type`、`--limit` | 记忆内容索引（派生物 `<库>/.local/index.sqlite`）/ 按默认口径检索（只含 VERIFIED） |
+| `pm hook` / `pm prompt` | `session-start`、`recall`、`install` / `get`、`list`、`set`、`exports` | DSH hooks 记忆注入（只读、有预算、可一键关）/ 每项目初始提示词数据（CAS + 审计） |
+| `pm task` | `list/show/create/transition/check/evidence/criteria/init-ids/dag/import-team/execution-config/link-session/unlink-session/handoff` | 任务、验收标准勾选与稳定编号、验收证据、DAG、AI 执行配置与 handoff（**不派发**） |
 | `pm proposal` | `list/show/create/approve/reject/revise` | 提案：批准才建任务；修订保留 ID 并重挂源 revision |
 | `pm memory` | `candidates/list/context/add/verify/deprecate/discard` —— 另有**保留**的分层命令 `scene/extract/condense/distill/stale` | 候选 → 人工确认 → 上下文包（只含 VERIFIED）；保留的那五条属 L1–L3 分层能力（当前不在界面与注入链路上用，见下文「记忆是扁平的」） |
 | `pm project` | `list/create/context/brief get/brief set` | 项目统一列表、按骨架建目录、项目简报（读 / 显式改写一段） |
@@ -231,9 +246,9 @@ role = "explore"
 |---|---|
 | 卡片 / 宿主 | `GET /ui-pm/cards`、`GET /ui-pm/capabilities`、`GET /ui-pm/events`、`POST /ui-pm/capture` |
 | 收件箱 | `GET /ui-pm/inbox`、`GET /ui-pm/inbox/:id`、`POST /ui-pm/inbox/:id/{archive,snooze,merge,note,dismiss,annotate,edit,pin,unpin}` |
-| 任务 | `GET /ui-pm/tasks`、`GET /ui-pm/tasks/:id`、`GET|POST /ui-pm/tasks/:id/execution-config`、`POST /ui-pm/tasks/:id/{link-session,unlink-session}`、`GET /ui-pm/tasks/:id/handoff` |
+| 任务 | `GET /ui-pm/tasks`、`GET /ui-pm/tasks/:id`、`GET\|POST /ui-pm/tasks/:id/execution-config`、`POST /ui-pm/tasks/:id/{link-session,unlink-session}`、`GET /ui-pm/tasks/:id/handoff` |
 | 提案 | `GET /ui-pm/proposals`、`GET /ui-pm/proposals/:id`、`POST /ui-pm/proposals/:id/{approve,reject,revise}` |
-| 项目 / 工作区 | `GET|POST /ui-pm/projects`、`GET /ui-pm/projects/:id/context`、`GET|POST /ui-pm/projects/:key/brief`、`GET /ui-pm/workspaces`、`GET /ui-pm/workspaces/context` |
+| 项目 / 工作区 | `GET\|POST /ui-pm/projects`、`GET /ui-pm/projects/:id/context`、`GET\|POST /ui-pm/projects/:key/brief`、`GET /ui-pm/workspaces`、`GET /ui-pm/workspaces/context` |
 | 记忆 | `GET /ui-pm/memory`、`POST /ui-pm/memory/:id/deprecate`、`POST /ui-pm/memory-candidates/:id/{verify,merge,discard}` |
 | **未实现（明确拒绝）** | `POST /ui-pm/tasks/:id/dispatch`、`submit-review`、`accept`、`return`（4 条在 `UNSUPPORTED_ENDPOINTS`，带原因；见[路线](#路线--未完成)） |
 
@@ -243,13 +258,13 @@ role = "explore"
 
 ### MCP 工具（`pm mcp`，stdio）
 
-10 个工具（实测 `src/pm/mcp.py` 的 `TOOLS`，2026-10-12）：
+11 个工具（实测 `src/pm/mcp.py` 的 `TOOLS`，2026-10-23）：
 `projects`、`cards`、`card`、`summary_queue`、`session_log`、`set_summary`、`capture`、
-`task_add`、`proposal_draft`、`render`。
+`pm_recall`、`task_add`、`proposal_draft`、`render`。
 
 - `task_add` 只能建 `TODO`/`NEXT`：写 `DONE`/`CANCELLED` 会被明确拒绝（`DONE_REQUIRES_HUMAN`）。
 - `proposal_draft` **只创建提案，绝不创建正式任务**（工具描述里写明）。
-- `capture` 同样返回那五个字段，并落一条审计。
+- `capture` 同样返回那五个字段，并落一条审计；它以 MCP（`source=mcp`）身份运行，因此追加到 **AI** 收件箱文件（`inbox-ai-<周期>.org`），从不写人工文件。
 
 ## 诚实契约
 
@@ -264,6 +279,7 @@ role = "explore"
 7. **写入门禁与只报不删**：未显式给出 `--config` 时，写命令必须带 `--yes`；`pm render` 默认干跑，`--write` 才落盘；`generated/` 下不再属于本次计划的文件标为 `orphan`，**只报不删**（数据源临时不可用时自动删除会毁掉重建能力）。**默认不输出对话正文**：来自 prompt 的文本要显式 `--show-prompt` 才打印。
 8. **假绿防护**（防的不是功能，是「验证本身说谎」）：
    - `scripts/verify-dsh-plugin.sh` 在验收开始/结束对 `inbox.org`、`overrides.org`、`projects/**` 取「文件集合 + 每个文件 sha256」指纹，改动/新增/删除都会 FAIL；并用 `--self-test-human-guard` 在临时副本上证明这条防线**真的会 FAIL**。
+     **已知缺口**：指纹里仍只写单文件 `inbox.org`，多文件拆分后人工真源 `inbox-human-*.org` **尚未**被它覆盖（见[路线](#路线--未完成)）；所以 PASS 不能读成「人工收件箱没被动过」。
    - harness 注入（给前端打桩）必须有硬断言的锚点，禁止静默 no-op；守卫本身带负例自测（源自一次真实假绿事故）。
    - 某个领域模块损坏（ImportError/SyntaxError）不得让整个 CLI 起不来，其余域照常注册。
 9. **原文只读 + 追加式补充 + 显式修订**：随手记的捕获原文永不就地改写；补充追加在正文里（带 actor/时间/rev）；确需改写走 `pm inbox edit --reason`，**旧值逐字留在条目里**。
@@ -285,7 +301,8 @@ role = "explore"
                      │
                      ▼
    ┌──────────────────────── work-memory 库（Org 是唯一真源）────────────────────────┐
-   │ inbox.org │ projects/proj-*/{project,tasks,memory}.org │ proposals.org │ memory/*.org │
+   │ inbox-human-*.org + inbox-ai-*.org（+ 生成的 inbox.org）│ projects/proj-*/{project,tasks,memory}.org │
+   │ proposals.org │ memory/*.org │
    └────────────────────────────────────────┬───────────────────────────────────────┘
                                             │  entities.apply_change（版本核对 + 原子写 + 审计 + 防重复提交）
                                             ▼
@@ -311,7 +328,8 @@ src/pm/
   scan.py                   归组、过滤、排序
   sources/                  ~/.dsh*/storages 只读读取层
   entities.py               所有写入的公共实现（版本核对 + 原子写 + 审计 + 防重复提交）
-  inbox.py / inbox_ops.py   收件箱解析与动作（分流 / 补充 / 修订 / 置顶）
+  inbox.py / inbox_ops.py   收件箱解析与动作（分流 / 补充 / 修订 / 置顶），跨所有收件箱文件
+  inbox_files.py            收件箱文件布局：按来源/周期的命名、聚合读取、生成视图、迁移
   tasks.py                  任务模型（状态机 / 验收标准 / DAG / import-team）
   proposals.py              提案模型（create / approve / reject / revise）
   memory.py                 记忆候选 → VERIFIED → 上下文包
@@ -384,15 +402,17 @@ tests/                      单元与集成测试 + 自建 DSH 夹具
 |---|---|---|
 | 界面截图 | **已补（演示库）** | 截图来自自建演示库 `~/dsh-pm-demo`（纯假数据，无真实项目名/路径/会话 ID）；复现命令见[界面](#界面)，全部 7 张见 [docs/screenshots.zh-CN.md](docs/screenshots.zh-CN.md) |
 | 验收脚本里一条静态检查的误判 | **修复中** | 门禁里 1 条 FAIL 是检查本身写得太死（锚点匹配），不是功能缺陷 |
+| 人类文件指纹 vs. 多文件收件箱 | **计划中** | `scripts/verify-dsh-plugin.sh`（C15）仍只对 `inbox.org` 取指纹；人工收件箱真源已是 `inbox-human-*.org` / `inbox-ai-*.org`，指纹尚未覆盖 |
 | DSH 派发（谁去执行任务；含防重复派发与失败重试） | **未实现** | `POST /ui-pm/tasks/:id/dispatch` 在 `UNSUPPORTED_ENDPOINTS`；执行配置只有「没准备好」（`NOT_READY`）/「可以交接」（`HANDOFF_READY`），不假装已派发 |
 | 专用 `submit-review` / `accept` / `return` 命令 | **未实现** | 现用 `pm task transition` + `actor=human` 等价 |
-| 任务变更历史（把 `:LOGBOOK:` 里记的流水读出来）+ 详情界面 | **计划中** | 已在内部排期 |
-| 任务证据（截图 / 链接）、AI 自评、事件时间线、验收标准项的固定编号 | **计划中** | 内部实现记录列为「尚未做」；写本 README 时按源码检索未见对应实现 |
+| 任务变更历史（把 `:LOGBOOK:` 里记的流水读出来）+ 详情界面 | **已交付** | `pm task show --json` 返回 `history` / `historyCount` / `historyTruncated`，任务详情右栏按时间倒序渲染（缺失字段写「未记录」） |
+| 任务证据（截图 / 链接）、验收标准项的固定编号 | **已交付** | `pm task evidence add/list`（kind / result，不知道就写 `info`）与 `pm task criteria init-ids`（给旧标准补 `c-xxxx`） |
+| AI 自评 + 事件时间线聚合 | **计划中** | 仍只存在于内部设计 |
 | 前端 JS 模块拆分（第二阶段）+ 测试不再依赖读源码文本 | **进行中** | 当前那条静态检查因此报 FAIL |
 | 拖拽/滑动的第三方库替换 | **评估中** | 拖放与横向滚动为自研实现（已可用）；是否换库在评估 |
 | 插件安装的端到端复验 | **进行中** | 安装走 GitHub（见上）；干净 profile 复验未做完 |
 | `pipx` / PyPI 发布 | **计划中** | `pipx install git+https://github.com/SunrShine/dsh-pm` 是目标形态；PyPI 未发布 |
-| `pm.el`（Emacs org-agenda / capture 入口） | **计划中** | 只存在于内部设计，仓库内没有实现文件 |
+| `pm.el`（Emacs org-agenda / capture 入口） | **已有**（仓库根 `pm.el`） | 看板跳转、agenda 文件、`C-c a P` 与多文件感知的 org-capture 模板（写当前 `inbox-human-*.org` 并带 `:ID:`）；另有 `pm-capture-inbox` / `pm-inbox-render` / `pm-inbox-open-current`（见 `emacs/README.md`） |
 | 贡献者协议、CI 工作流 | **待补** | 许可已定为 MIT（见下） |
 | 双语 README | **已提供** | `README.md` 为英文主文档，中文见 `README.zh-CN.md`；两份由 `scripts/verify_doc_pairing.py` 成对校验（一侧改了另一侧没跟上会红） |
 | 与其它 DSH 版本的兼容范围 | **TODO** | 目前只随 `0.2.1-alpha.x` 验证过 |

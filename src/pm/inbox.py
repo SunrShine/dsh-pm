@@ -404,18 +404,30 @@ def parse_entries(text: str, *, with_annotations: bool = False) -> list[dict]:
     return entries
 
 
-def read_inbox(library: Path | None) -> dict | None:
-    """读取库根下的 inbox.org。
+def read_inbox(library: Path | None, modes=None) -> dict | None:
+    """聚合读取多文件 inbox（inbox-human-* / inbox-ai-* / 旧 inbox.org）。
 
-    无库、无文件、解码失败 → None（调用方据此输出 inbox: null，不得抛错）。
-    文件存在但为空 → {path, count: 0, entries: []}。
+    无库、无任何文件、解码失败 → None（调用方据此输出 inbox: null，不得抛错）。
+    返回结构兼容旧调用方：{path, count, entries}，另带 files / counts；
+    每条 entry 额外带 origin（human/ai）与 file（相对文件名）。
     """
     if library is None:
         return None
-    path = Path(library) / INBOX_RELATIVE
+    from pm import inbox_files  # 延迟导入：inbox_files 复用本模块解析器，避免循环
+    root = Path(library)
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        files = inbox_files.discover(root)
+    except OSError:
         return None
-    entries = parse_entries(text)
-    return {"path": INBOX_RELATIVE, "count": len(entries), "entries": entries}
+    if not files:
+        # 兼容旧契约：文件存在但为空 → 空 payload（不是 null）；坏编码 → null
+        legacy = root / INBOX_RELATIVE
+        if legacy.is_file():
+            try:
+                legacy.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                return None
+            return {"path": INBOX_RELATIVE, "count": 0, "files": [],
+                    "counts": {"human": 0, "ai": 0}, "entries": []}
+        return None
+    return inbox_files.read_entries(root)
