@@ -40,7 +40,7 @@ dsh-pm treats sessions strictly as **read-only input** and distils them into "wo
 - The internal design / convention / acceptance / memo records are **not published with the repository**, so this README never links to them; where they are mentioned, they are called "internal records (not published)" together with the command and the date.
 - The skills shipped to agents: [skill/pm/SKILL.md](skill/pm/SKILL.md); the details of each skill live next to it under `references/` (loaded on demand instead of bloating the main file).
 
-> Status: **v0.3 series** (latest release **v0.3.1**, 2026-10-22); the repository is **public** at [github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm).
+> Status: **v0.3 series** (latest release **v0.3.2**, 2026-10-23); the repository is **public** at [github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm).
 > Anything unfinished is listed under [roadmap / not done](#roadmap--not-done) at the end — never written up as done.
 
 ## UI
@@ -270,8 +270,7 @@ This is where the project spends most of its effort: **rather write "I do not kn
 6. **Unapproved proposals create no tasks.** `proposal create` only writes `proposals.org` (marking the source inbox `TASK_PROPOSED`); `approve` creates the real task and marks the inbox `TASK_CREATED`.
 7. **Write gate and report-only deletion**: without an explicit `--config`, a write command must carry `--yes`; `pm render` is dry-run by default and only `--write` persists; files under `generated/` that are no longer part of this plan are marked `orphan` and **only reported, never deleted** (auto-deleting when a data source is temporarily unavailable would destroy rebuildability). **Conversation bodies are not printed by default**: text coming from prompts requires an explicit `--show-prompt`.
 8. **Fake-green protection** (guarding not the features but "verification itself lying"):
-   - `scripts/verify-dsh-plugin.sh` fingerprints `inbox.org`, `overrides.org` and `projects/**` (file set + per-file sha256) at the start and end of acceptance; any change/addition/deletion FAILs; `--self-test-human-guard` proves on a temporary copy that this line **really does FAIL**.
-     **Known gap**: the fingerprint still names the single `inbox.org`, so after the multi-file split the human truth in `inbox-human-*.org` is **not** covered by it yet (see [roadmap](#roadmap--not-done)); do not read a PASS as "the human inbox was not touched".
+   - `scripts/verify-dsh-plugin.sh` fingerprints the **multi-file human inbox truth** (`inbox-human-*.org` / `inbox-ai-*.org`, plus a legacy non-generated `inbox.org`), `overrides.org` and `projects/**` (file set + per-file sha256) at the start and end of acceptance; any change/addition/deletion FAILs; `--self-test-human-guard` proves on a temporary copy that this line **really does FAIL**.
    - Harness injection (stubbing the frontend) must have hard-assertion anchors; silent no-ops are forbidden, and the guard itself ships negative self-tests (born from a real fake-green incident).
    - A broken domain module (ImportError/SyntaxError) must not stop the whole CLI; the other domains still register.
 9. **Read-only originals + append-only addenda + explicit revision**: a captured quick note is never rewritten in place; addenda are appended to the body (with actor/time/rev); when a rewrite is genuinely needed it goes through `pm inbox edit --reason`, and **the old value stays verbatim in the entry**.
@@ -298,7 +297,7 @@ This is where the project spends most of its effort: **rather write "I do not kn
    └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                             │  entities.apply_change (revision check + atomic write + audit + dedup)
                                             ▼
-        pm CLI (16 top-level commands) ◄──────► pm MCP server (10 tools, stdio)
+        pm CLI (20 top-level commands) ◄──────► pm MCP server (11 tools, stdio)
                     │                              │
                     └───────► pm ui-cards (stable JSON) ◄───────┘
                                      │
@@ -328,7 +327,7 @@ src/pm/
   projects.py               project list / scaffold a directory / brief (read + rewrite one section)
   execution.py              execution config / session linking / handoff (describes readiness only, never dispatches)
   ui_cards.py               the JSON shape the plugin consumes
-  mcp.py                    MCP server (stdio, 10 tools)
+  mcp.py                    MCP server (stdio, 11 tools)
   render/                   org / table / console / write plan
   scaffold.py               human-file templates
 skill/pm/SKILL.md           the skill for agents
@@ -393,7 +392,7 @@ The other `scripts/verify_*.py` either read code only or verify against a tempor
 |---|---|---|
 | UI screenshots | **Done (demo library)** | Captured from a self-built demo library `~/dsh-pm-demo` (pure fake data; no real project names/paths/session ids); reproduce with the commands in [UI](#ui) |
 | One static check in the acceptance script mis-firing | **Being fixed** | The single FAIL in the gate is the check itself being too rigid (anchor matching), not a functional defect |
-| Human-file fingerprint vs. the multi-file inbox | **Planned** | `scripts/verify-dsh-plugin.sh` (C15) still fingerprints only `inbox.org`; the human inbox truth is now `inbox-human-*.org` / `inbox-ai-*.org`, which the fingerprint does not watch yet |
+| Human-file fingerprint vs. the multi-file inbox | **Done (2026-10-23)** | C15 now fingerprints `inbox-human-*.org` / `inbox-ai-*.org` (+ a legacy non-generated `inbox.org`), `overrides.org` and `projects/**`; its self-test covers a rotation file too |
 | DSH dispatch (who executes a task; including dedup and retry) | **Not implemented** | `POST /ui-pm/tasks/:id/dispatch` sits in `UNSUPPORTED_ENDPOINTS`; execution config only has "not ready" (`NOT_READY`) / "ready for handoff" (`HANDOFF_READY`) and never pretends to have dispatched |
 | Dedicated `submit-review` / `accept` / `return` commands | **Not implemented** | `pm task transition` + `actor=human` is the equivalent today |
 | Task change history (reading the `:LOGBOOK:` trail) + a detail view | **Done** | `pm task show --json` returns `history` / `historyCount` / `historyTruncated`, and the task detail pane renders it (newest first; missing fields read "not recorded") |

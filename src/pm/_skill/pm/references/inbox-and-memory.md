@@ -1,25 +1,29 @@
 # 随手记 / 提案 / 记忆（inbox · proposal · memory）
 
-## 1. 随手记 inbox（`inbox.org`）
+## 1. 随手记 inbox（多文件：`inbox-human-*.org` / `inbox-ai-*.org` + 生成视图 `inbox.org`）
 
 - 一句话先记下来，之后再分流。**捕获原文只读**：补充是**追加**，改写要显式修订并**逐字留旧值**。
+- **真源按来源 + 周期轮转**：人工默认 weekly（`inbox-human-2026-W43.org`）、AI 默认 monthly（`inbox-ai-2026-10.org`）；
+  配置 `[inbox] human_mode/ai_mode`（weekly/monthly/quarterly/yearly/single/per-entry；代码默认 single 兼容旧库）。
+  **归档 = 时间轮转，不搬文件**；`inbox.org` 只是 `pm inbox render` 生成的只读汇总视图。
 - 状态机：`CAPTURED → TRIAGE → TASK_PROPOSED → TASK_CREATED`；另有终态 `ARCHIVED / MERGED / DISMISSED`。
 
 ```sh
-pm capture "一句话" [--project KEY] [--dry-run]     # 只追加，不改已有内容（标题由正文自动取）
-pm inbox list [--status S] [--json]                    # 带 annotationCount/revisionCount/pinned/lastAnnotationText
+pm capture "一句话" [--project KEY] [--dry-run]     # 只追加，不改已有内容；CLI/人工→human 文件，MCP/AI→ai 文件
+pm inbox list [--status S] [--origin human|ai] [--json]  # 带 annotationCount/revisionCount/pinned/lastAnnotationText
 pm inbox annotate <inbox-id> --text "补充"             # 追加一段补充（带 actor/时间/rev）
 pm inbox edit     <inbox-id> --text "新正文" --reason "为什么改"   # 显式修订，旧值逐字留档
 pm inbox history  <inbox-id>                            # 看补充/修订流水
 pm inbox set-status <inbox-id> --status TRIAGE|TASK_PROPOSED|TASK_CREATED|ARCHIVED|DISMISSED \
     --expected-revision N --reason R
-pm inbox archive|snooze|merge|note|dismiss|pin|unpin    # 分流动作；pin 置顶，unpin 取消
+pm inbox archive|snooze|merge|note|dismiss|pin|unpin    # 分流动作；pin 置顶，unpin 取消（都按 :ID: 跨文件写回所在文件）
+pm inbox files|render [--check]|migrate [--dry-run|--write]  # 真源清单 / 生成视图 / 旧单文件库迁移
 ```
 
 - **`edit`/`set-status` 都要 `--reason`**（写审计）；非法迁移会被明确拒绝，**不静默降级**。
 - **快速记录没有服务端幂等键**（实测，task-01M51Z5A7…）：`pm capture` 没有 `--idempotency-key`；HTTP 路由 `POST /ui-pm/capture`
   **不是字段白名单** —— body 里多带的字段（`idempotencyKey`/`expectedRevision` 等）会被**静默忽略**（**200**，不是 400），
-  同键 + 同 text 连发两次 ⇒ `inbox.org` **多两条**。400 只出现在 `text` 为空/非字符串、或 body 不是对象（`INVALID_BODY`）。
+  同键 + 同 text 连发两次 ⇒ 对应周期文件（`inbox-human-<period>.org` / `inbox-ai-<period>.org`）**多两条**。400 只出现在 `text` 为空/非字符串、或 body 不是对象（`INVALID_BODY`）。
   ⇒ 防重复入库目前只有**客户端在飞去重**（U2，`frontend_impl/pm-write.js`）；别指望塞 key 能去重。
   将来要做：① `pm capture` 加 `--idempotency-key`（写入改走一次 CAS + 幂等键，现在 `capture` 是 append 直写）② 插件 `captureArgs()` 透传成 argv ③ 前端 body 带 key。
   复现：`python3 scripts/verify_capture_no_idempotency.py`（一次性隔离实例 + 临时库，7 项判据）。

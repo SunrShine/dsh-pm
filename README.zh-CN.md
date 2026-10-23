@@ -40,7 +40,7 @@ dsh-pm 只把会话当**只读输入**，整理成一张张「工作卡」；而
 - 设计与验收的细节记录属于**内部资料，未随仓库发布**；正文里凡引用它们的地方，都写成「内部记录（未随仓库发布）」并给出命令与日期。
 - 给 agent 的 skill（随仓库分发）：[skill/pm/SKILL.md](skill/pm/SKILL.md)；每份 skill 的细节放在相邻的 `references/` 里（按需加载，不塞进主文件）。
 
-> 状态：**v0.3 系列**（最新发布 **v0.3.1**，2026-10-22）；仓库已**公开**：[github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm)。
+> 状态：**v0.3 系列**（最新发布 **v0.3.2**，2026-10-23）；仓库已**公开**：[github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm)。
 > 未完成的东西一律放在文末[路线 / 未完成](#路线--未完成)，不写成已完成。
 
 ## 界面
@@ -278,8 +278,7 @@ role = "explore"
 6. **未批准的提案不建任务**。`proposal create` 只写 `proposals.org`（并在源 inbox 上标 `TASK_PROPOSED`），`approve` 才创建正式任务并把 inbox 标 `TASK_CREATED`。
 7. **写入门禁与只报不删**：未显式给出 `--config` 时，写命令必须带 `--yes`；`pm render` 默认干跑，`--write` 才落盘；`generated/` 下不再属于本次计划的文件标为 `orphan`，**只报不删**（数据源临时不可用时自动删除会毁掉重建能力）。**默认不输出对话正文**：来自 prompt 的文本要显式 `--show-prompt` 才打印。
 8. **假绿防护**（防的不是功能，是「验证本身说谎」）：
-   - `scripts/verify-dsh-plugin.sh` 在验收开始/结束对 `inbox.org`、`overrides.org`、`projects/**` 取「文件集合 + 每个文件 sha256」指纹，改动/新增/删除都会 FAIL；并用 `--self-test-human-guard` 在临时副本上证明这条防线**真的会 FAIL**。
-     **已知缺口**：指纹里仍只写单文件 `inbox.org`，多文件拆分后人工真源 `inbox-human-*.org` **尚未**被它覆盖（见[路线](#路线--未完成)）；所以 PASS 不能读成「人工收件箱没被动过」。
+   - `scripts/verify-dsh-plugin.sh` 在验收开始/结束对**多文件人工真源**（`inbox-human-*.org` / `inbox-ai-*.org` + 非生成视图的旧 `inbox.org`）、`overrides.org`、`projects/**` 取「文件集合 + 每个文件 sha256」指纹，改动/新增/删除都会 FAIL；并用 `--self-test-human-guard` 在临时副本上证明这条防线**真的会 FAIL**。
    - harness 注入（给前端打桩）必须有硬断言的锚点，禁止静默 no-op；守卫本身带负例自测（源自一次真实假绿事故）。
    - 某个领域模块损坏（ImportError/SyntaxError）不得让整个 CLI 起不来，其余域照常注册。
 9. **原文只读 + 追加式补充 + 显式修订**：随手记的捕获原文永不就地改写；补充追加在正文里（带 actor/时间/rev）；确需改写走 `pm inbox edit --reason`，**旧值逐字留在条目里**。
@@ -306,7 +305,7 @@ role = "explore"
    └────────────────────────────────────────┬───────────────────────────────────────┘
                                             │  entities.apply_change（版本核对 + 原子写 + 审计 + 防重复提交）
                                             ▼
-        pm CLI（16 个顶层命令） ◄──────► pm MCP server（10 个工具，stdio）
+        pm CLI（20 个顶层命令） ◄──────► pm MCP server（11 个工具，stdio）
                     │                              │
                     └───────► pm ui-cards（稳定 JSON）◄───────┘
                                      │
@@ -336,7 +335,7 @@ src/pm/
   projects.py               项目列表 / 建目录 / 简报（读 + 显式改一段）
   execution.py              执行配置 / 会话关联 / handoff（只描述准备，不派发）
   ui_cards.py               给插件用的 JSON 格式
-  mcp.py                    MCP server（stdio，10 个工具）
+  mcp.py                    MCP server（stdio，11 个工具）
   render/                   org / 表格 / console / 写入计划
   scaffold.py               人工文件模板
 skill/pm/SKILL.md           给 agent 的 skill
@@ -402,7 +401,7 @@ tests/                      单元与集成测试 + 自建 DSH 夹具
 |---|---|---|
 | 界面截图 | **已补（演示库）** | 截图来自自建演示库 `~/dsh-pm-demo`（纯假数据，无真实项目名/路径/会话 ID）；复现命令见[界面](#界面)，全部 7 张见 [docs/screenshots.zh-CN.md](docs/screenshots.zh-CN.md) |
 | 验收脚本里一条静态检查的误判 | **修复中** | 门禁里 1 条 FAIL 是检查本身写得太死（锚点匹配），不是功能缺陷 |
-| 人类文件指纹 vs. 多文件收件箱 | **计划中** | `scripts/verify-dsh-plugin.sh`（C15）仍只对 `inbox.org` 取指纹；人工收件箱真源已是 `inbox-human-*.org` / `inbox-ai-*.org`，指纹尚未覆盖 |
+| 人类文件指纹 vs. 多文件收件箱 | **已完成（2026-10-23）** | C15 现覆盖 `inbox-human-*.org` / `inbox-ai-*.org`（+ 非生成视图的旧 `inbox.org`）、`overrides.org`、`projects/**`；自检含轮转文件负例 |
 | DSH 派发（谁去执行任务；含防重复派发与失败重试） | **未实现** | `POST /ui-pm/tasks/:id/dispatch` 在 `UNSUPPORTED_ENDPOINTS`；执行配置只有「没准备好」（`NOT_READY`）/「可以交接」（`HANDOFF_READY`），不假装已派发 |
 | 专用 `submit-review` / `accept` / `return` 命令 | **未实现** | 现用 `pm task transition` + `actor=human` 等价 |
 | 任务变更历史（把 `:LOGBOOK:` 里记的流水读出来）+ 详情界面 | **已交付** | `pm task show --json` 返回 `history` / `historyCount` / `historyTruncated`，任务详情右栏按时间倒序渲染（缺失字段写「未记录」） |

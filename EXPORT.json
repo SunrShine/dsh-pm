@@ -1,11 +1,11 @@
 {
   "generatedBy": "tools/export-public.py",
-  "generatedAt": "2026-10-23T17:27:31+0800",
+  "generatedAt": "2026-10-23T20:22:20+0800",
   "license": "MIT",
   "releaseVersion": "0.3.2",
   "source": {
     "repo": "dsh-pm（private 开发仓库）",
-    "commit": "471d712cba42cca800e0270c11e275a44685e243",
+    "commit": "a31bf0e12bf7e6445cffd1a9afc3685d53da3d72",
     "branch": "HEAD",
     "dirty": false,
     "dirtyPaths": []
@@ -140,14 +140,14 @@
       "tests": 1032,
       "result": "ok",
       "exitCode": 0,
-      "durationSec": 64.2
+      "durationSec": 64.4
     },
     "reason": null,
     "exitCode": 0
   },
   "counts": {
     "files": 265,
-    "bytes": 6008264,
+    "bytes": 6010149,
     "copiedFromSource": 180,
     "transformedFiles": 58,
     "note": "files/bytes 含 EXPORT.json 自身"

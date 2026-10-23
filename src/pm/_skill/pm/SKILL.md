@@ -31,7 +31,7 @@ whenToUse: 用户说"记录一下""更新进展""××项目做到哪了""帮我�
 ## 三条硬规则（违反会破坏数据）
 
 1. **不要手写 `generated/**` 下的任何文件**：每次 render 整体重写，你的修改会被覆盖。
-2. **人工文件只读**（`inbox.org` / `overrides.org` / `projects/*/*.org` / `journal/*.org`）：
+2. **人工文件只读**（`inbox-human-*.org` / `inbox-ai-*.org` / `overrides.org` / `projects/*/*.org` / `journal/*.org`；`inbox.org` 是生成视图，勿手改）：
    要改内容就用 `pm` 的写命令（它们带 CAS + 审计），或直接问用户。
    唯一例外是人在编辑它们；AI 不要"顺手改一下"。
 3. **不要输出对话正文**：卡片与摘要只放结构化事实或你生成的一句话摘要。
@@ -41,7 +41,7 @@ whenToUse: 用户说"记录一下""更新进展""××项目做到哪了""帮我�
 
 | 想记什么 | 写哪里（库内相对路径） | 用什么命令 |
 |---|---|---|
-| 随手记、还不成形 | `inbox.org` | `pm capture "..."` |
+| 随手记、还不成形 | `inbox-human-<period>.org`（人工；AI 用 `inbox-ai-<period>.org`；`inbox.org` 是生成视图） | `pm capture "..."`（按来源路由） |
 | 项目目标 / 范围 / 验收标准 / 里程碑 / 风险 | `projects/proj-<key>/project.org` | `pm project brief set`（人显式提交） |
 | 任务、状态流转、验收标准勾选、证据 | `projects/proj-<key>/tasks.org` | `pm task ...`（见下） |
 | 该项目的记忆（事实 / 决策 / 坑） | `projects/proj-<key>/memory.org` + 全局 `memory/*.org` | `pm memory ...` |
@@ -49,13 +49,14 @@ whenToUse: 用户说"记录一下""更新进展""××项目做到哪了""帮我�
 | 会话摘要（人工版优先） | `overrides.org` | 人写；AI 用 `pm summary set` |
 | 日记 | `journal/YYYY-MM-DD.org` | 人写 |
 
-## 常用命令（v0.2.0）
+## 常用命令（v0.3.2）
 
 ```sh
 pm scan [--all] [--limit N] [--project KEY] [--instance ID] [--json]   # 只读：工作卡现状
 pm project list|create|context|brief get|brief set                      # 项目与简报
-pm capture "..." [--project KEY]                                        # 往 inbox 追加一条随手记
-pm inbox list|archive|snooze|merge|note|dismiss|set-status|annotate|edit|history|pin|unpin
+pm capture "..." [--project KEY]                                        # 往 inbox 追加一条随手记（CLI→人工文件；MCP→AI 文件）
+pm inbox list [--status S] [--origin human|ai]|archive|snooze|merge|note|dismiss|set-status|annotate|edit|history|pin|unpin
+pm inbox files|render [--check]|migrate [--dry-run|--write]              # 多文件 inbox：真源清单 / 生成视图 / 旧库迁移
 pm task list|show|create|transition|check|criteria|evidence|import-team|dag|execution-config
 pm proposal list|show|create|approve|reject|revise
 pm memory candidates|list|context|add|verify|deprecate|stale
