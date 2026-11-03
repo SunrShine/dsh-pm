@@ -116,6 +116,29 @@ def _relative(layout: Layout, path: Path) -> str:
         return str(path)
 
 
+def path_index(root) -> dict[str, dict[str, str]]:
+    """`{规范化路径: {key, title}}`：库内项目显式声明的 #+PM_PATH: / :PM_PATHS:。
+
+    用途：DSH 工作区显示名变化时，投影仍能按**路径**归到库内项目；
+    未声明的路径不猜（调用方回退到工作区标题 slug）。
+    """
+    from pm.config import normalize_path
+
+    out: dict[str, dict[str, str]] = {}
+    projects_root = Path(root) / "projects" if root is not None else None
+    if projects_root is None or not projects_root.is_dir():
+        return out
+    for path in sorted(projects_root.glob("proj-*/project.org")):
+        info = _read_project_org(path)
+        key = str(info.get("key") or "").strip() or path.parent.name.removeprefix("proj-")
+        title = str(info.get("title") or "").strip() or key
+        for raw in info.get("paths") or []:
+            value = normalize_path(str(raw).strip())
+            if value:
+                out[value] = {"key": key, "title": title}
+    return out
+
+
 def library_projects(layout: Layout) -> dict[str, dict]:
     """库里已建目录的行（inLibrary=true）。"""
     rows: dict[str, dict] = {}

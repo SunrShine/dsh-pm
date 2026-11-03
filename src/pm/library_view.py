@@ -27,6 +27,8 @@ def attach_library_summaries(config: Config, result: ScanResult) -> int:
             continue
         agent.resolved_summary = entry.text
         agent.resolved_summary_source = entry.source
+        agent.resolved_summary_generated_at = entry.generated_at
+        agent.resolved_summary_generated_by = entry.generated_by
         if entry.source == "human":
             agent.human_summary = entry.text
         hit += 1

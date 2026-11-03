@@ -149,6 +149,9 @@ class Agent:
     #: 从库里解析出来的摘要（人工 > AI），以及它的来源标记。
     resolved_summary: str = ""
     resolved_summary_source: str = ""
+    #: 摘要的生成者/生成时间（AI 摘要来自 ai-summaries.org；人工摘要通常为空）。
+    resolved_summary_generated_at: str = ""
+    resolved_summary_generated_by: str = ""
     source: str = "projcache"
     warnings: list[str] = field(default_factory=list)
     raw_path: str = ""

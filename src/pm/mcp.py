@@ -698,6 +698,81 @@ def tool_proposal_draft(svc: Service, args: dict[str, Any]) -> str:
     )
 
 
+def tool_proposal_revise(svc: Service, args: dict[str, Any]) -> str:
+    """AI 对话后修订 PENDING 提案：只改 proposals.org，保留 ID，plan revision +1。
+
+    与 CLI `pm proposal revise` 走同一个 proposals.revise；不创建任务、不派发、
+    不改源 inbox 状态。changes / risks / actions 给了才整组替换，没给的保持不变。
+    """
+    from pm import proposals as proposals_module  # 延迟 import，避免循环依赖
+
+    proposal_id = str(args.get("proposalId") or "").strip()
+    if not proposal_id:
+        raise ToolError("需要 proposalId（提案 :ID:）")
+    try:
+        expected = int(args.get("expectedRevision"))
+    except (TypeError, ValueError):
+        raise ToolError("需要 expectedRevision（你看到的提案 :PM_REVISION:）")
+
+    def optional_list(name: str):
+        if name not in args:
+            return None
+        value = args.get(name)
+        if value is None:
+            return None
+        if not isinstance(value, list):
+            raise ToolError(name + " 必须是数组")
+        return [str(item) for item in value]
+
+    changes = optional_list("changes")
+    risks = optional_list("risks")
+    actions = optional_list("actions")
+    title = args.get("title")
+    title = str(title).strip() if title is not None else None
+    if title == "":
+        title = None
+
+    layout = svc.layout()
+    try:
+        result = proposals_module.revise(
+            layout.root,
+            proposal_id,
+            expected_revision=expected,
+            title=title,
+            changes=changes,
+            risks=risks,
+            actions=actions,
+            actor="ai",
+            reason=str(args.get("reason") or "AI 与用户对话后修订提案"),
+            idempotency_key=(str(args.get("idempotencyKey") or "").strip() or None),
+            dry_run=bool(args.get("dryRun", False)),
+        )
+    except Exception as exc:
+        code = str(getattr(exc, "code", "PROPOSAL_ERROR"))
+        message = str(getattr(exc, "message", exc))
+        raise ToolError("[" + code + "] " + message)
+    try:
+        relative = str(Path(result.path).relative_to(layout.root))
+    except ValueError:  # pragma: no cover - 提案文件永远在库根下
+        relative = str(result.path)
+    return json.dumps(
+        {
+            "ok": True,
+            "entityId": result.entity_id,
+            "status": result.status,
+            "revision": result.revision,
+            "previousRevision": result.previous_revision,
+            "planRevision": result.plan_revision,
+            "baseRevision": result.base_revision,
+            "sourceInboxId": result.source_inbox_id,
+            "path": relative,
+            "dryRun": bool(result.dry_run),
+            "written": list((result.extra or {}).get("written") or []),
+            "notWritten": list((result.extra or {}).get("notWritten") or []),
+        },
+        ensure_ascii=False,
+    )
+
 def tool_render(svc: Service, args: dict[str, Any]) -> str:
     layout = svc.layout()
     project = args.get("project")
@@ -899,6 +974,48 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         tool_proposal_draft,
+    ),
+    ToolSpec(
+        "proposal_revise",
+        "AI 与用户对话后修订 PENDING 提案的风险 / 待确认事项 / 变更计划。"
+        "保留 proposal ID，plan revision +1；只写 proposals.org，不创建任务、不派发、"
+        "不改源 inbox 状态。changes/risks/actions 给了才整组替换；必须带 "
+        "expectedRevision（CAS，版本冲突会明确报 REVISION_CONFLICT）。",
+        {
+            "type": "object",
+            "properties": {
+                "proposalId": {"type": "string", "description": "提案 :ID:"},
+                "expectedRevision": {
+                    "type": "integer",
+                    "description": "你看到的提案 :PM_REVISION:（CAS；过期请先 show 再重试）",
+                },
+                "title": {"type": "string"},
+                "changes": {
+                    "type": "array",
+                    "description": "整组替换变更列表（省略=不改变）；每项与 proposal_draft 相同",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "op": {"type": "string"},
+                            "title": {"type": "string"},
+                            "text": {"type": "string"},
+                            "taskId": {"type": "string"},
+                            "criteria": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["op"],
+                        "additionalProperties": False,
+                    },
+                },
+                "risks": {"type": "array", "items": {"type": "string"}},
+                "actions": {"type": "array", "items": {"type": "string"}},
+                "reason": {"type": "string"},
+                "idempotencyKey": {"type": "string"},
+                "dryRun": {"type": "boolean"},
+            },
+            "required": ["proposalId", "expectedRevision"],
+            "additionalProperties": False,
+        },
+        tool_proposal_revise,
     ),
     ToolSpec(
         "render",

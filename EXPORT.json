@@ -1,11 +1,11 @@
 {
   "generatedBy": "tools/export-public.py",
-  "generatedAt": "2026-10-23T20:22:20+0800",
+  "generatedAt": "2026-11-03T16:49:08+0800",
   "license": "MIT",
-  "releaseVersion": "0.3.2",
+  "releaseVersion": "0.3.3",
   "source": {
     "repo": "dsh-pm（private 开发仓库）",
-    "commit": "a31bf0e12bf7e6445cffd1a9afc3685d53da3d72",
+    "commit": "5f76d3d5c5f0efe12781a506ab3d82735815faec",
     "branch": "HEAD",
     "dirty": false,
     "dirtyPaths": []
@@ -18,8 +18,8 @@
   },
   "plugin": {
     "mode": "require",
-    "libFiles": 55,
-    "contractFiles": 57,
+    "libFiles": 71,
+    "contractFiles": 73,
     "appFiles": 24,
     "packageJsonFiles": [
       "lib/**",
@@ -32,7 +32,7 @@
     ],
     "packageJsonDeltas": [
       "name -> dsh-pm",
-      "version -> 0.3.2（跟随 pyproject.toml；原插件构建版本 0.2.1-alpha.1）",
+      "version -> 0.3.3（跟随 pyproject.toml；原插件构建版本 0.2.1-alpha.1）",
       "description 追加 npm 同名包警告",
       "dsh.bundle.patch -> ./cordis.patch.yml",
       "peerDependencies 整段删除（D2：不声明 dsh* peer）",
@@ -43,7 +43,7 @@
     ],
     "dirty": false,
     "dirtyPaths": [],
-    "sourceCommit": "1b3e53832634019ab6df9478e4ef96b3522d4850"
+    "sourceCommit": "816c5e6021bf78cacd6deeb3ab9609f5c0a3e863"
   },
   "assets": {
     "files": 19,
@@ -137,17 +137,17 @@
       "ran": true,
       "interpreter": "python3.11",
       "interpreterVersion": "Python 3.11.17",
-      "tests": 1032,
+      "tests": 1041,
       "result": "ok",
       "exitCode": 0,
-      "durationSec": 64.4
+      "durationSec": 82.4
     },
     "reason": null,
     "exitCode": 0
   },
   "counts": {
-    "files": 265,
-    "bytes": 6010149,
+    "files": 281,
+    "bytes": 6173695,
     "copiedFromSource": 180,
     "transformedFiles": 58,
     "note": "files/bytes 含 EXPORT.json 自身"

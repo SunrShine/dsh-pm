@@ -276,11 +276,11 @@ def is_ai_block(block: dict) -> bool:
     return added_by not in ("", "cli", "human")
 
 
-def render_text(library: Path, modes=None) -> str:
+def render_text(library: Path, modes=None, *, now: datetime | None = None) -> str:
     """生成 inbox.org 汇总视图文本：当前人工/AI 文件内联，历史文件只列链接。"""
     modes = modes_of(modes)
     library = Path(library)
-    now = datetime.now().astimezone()
+    now = now or datetime.now().astimezone()
     if modes.human == "single":
         return "#+TITLE: Inbox\n" + TODO_LINE + "\n" + GENERATED_MARKER + "（当前是单文件模式，无需汇总视图）\n"
     cur_human = human_path(library, now, modes)
@@ -331,14 +331,14 @@ def render_text(library: Path, modes=None) -> str:
     return "\n".join(parts) + "\n"
 
 
-def render(library: Path, modes=None, *, check: bool = False) -> dict:
+def render(library: Path, modes=None, *, check: bool = False, now: datetime | None = None) -> dict:
     """生成/校验 inbox.org 汇总视图。check=True 时不写，返回是否一致。"""
     library = Path(library)
     target = library / inbox.INBOX_RELATIVE
     if modes_of(modes).human == "single":
         return {"ok": True, "path": inbox.INBOX_RELATIVE, "changed": False, "written": False,
                 "skipped": "单文件模式（human_mode=single）不需要汇总视图"}
-    wanted = render_text(library, modes)
+    wanted = render_text(library, modes, now=now)
     current = ""
     if target.is_file():
         try:

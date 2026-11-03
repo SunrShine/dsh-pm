@@ -166,6 +166,8 @@ class ProposalDraftToolTest(unittest.TestCase):
         tools = {tool["name"]: tool for tool in response["result"]["tools"]}
         self.assertIn("proposal_draft", tools)
         self.assertIn("绝不创建正式任务", tools["proposal_draft"]["description"])
+        self.assertIn("proposal_revise", tools)
+        self.assertIn("风险", tools["proposal_revise"]["description"] or "")
 
     def test_draft_writes_proposal_and_leaves_tasks_untouched(self) -> None:
         before = self.tasks_file.read_bytes() if self.tasks_file.is_file() else None
@@ -223,6 +225,37 @@ class ProposalDraftToolTest(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertEqual(json.loads(out.getvalue())["error"]["code"], "NOT_FOUND")
 
+    def test_revise_updates_risks_and_actions_with_cas(self) -> None:
+        """AI 对话后可修订 PENDING 提案；只写 proposals.org，tasks.org 零变化。"""
+        before_tasks = self.tasks_file.read_bytes() if self.tasks_file.is_file() else None
+        drafted = json.loads(self.draft())
+        payload = json.loads(mcp.tool_proposal_revise(self.service, {
+            "proposalId": drafted["entityId"],
+            "expectedRevision": drafted["revision"],
+            "risks": ["新风险：L0 拍读口径差 2 倍"],
+            "actions": ["请用户确认每 1.6GHz 拍 256B 还是每 800MHz 拍 256B"],
+            "reason": "用户与 AI 对话后补充风险",
+        }))
+        self.assertEqual(payload["status"], "PENDING")
+        self.assertEqual(payload["entityId"], drafted["entityId"])
+        self.assertEqual(payload["revision"], drafted["revision"] + 1)
+        self.assertEqual(payload["planRevision"], 2)
+        proposals = (self.library / "proposals.org").read_text(encoding="utf-8")
+        self.assertIn("新风险：L0 拍读口径差 2 倍", proposals)
+        self.assertIn("请用户确认每 1.6GHz 拍 256B", proposals)
+        self.assertNotIn("尚未确认参考模型 revision", proposals)
+        after_tasks = self.tasks_file.read_bytes() if self.tasks_file.is_file() else None
+        self.assertEqual(before_tasks, after_tasks, "提案修订绝不能改 tasks.org")
+
+    def test_revise_rejects_stale_revision(self) -> None:
+        drafted = json.loads(self.draft())
+        with self.assertRaises(mcp.ToolError) as ctx:
+            mcp.tool_proposal_revise(self.service, {
+                "proposalId": drafted["entityId"],
+                "expectedRevision": drafted["revision"] + 99,
+                "risks": ["x"],
+            })
+        self.assertIn("[REVISION_CONFLICT]", str(ctx.exception))
     def test_missing_changes_is_rejected(self) -> None:
         with self.assertRaises(mcp.ToolError):
             self.draft(changes=[])

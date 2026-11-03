@@ -113,6 +113,62 @@
 
 </div>
 
+<!-- 批量补齐摘要：按需触发，逐个会话发送提示词；失败逐条列出，不假装成功 -->
+<dialog id="batch-summary-dialog" aria-labelledby="batch-summary-title">
+  <form method="dialog" class="dialog-form" id="batch-summary-form">
+    <div class="dialog-head">
+      <div>
+        <h2 id="batch-summary-title" data-i18n="batch.title">Fill missing summaries</h2>
+        <p class="subtle" id="batch-summary-hint"></p>
+      </div>
+      <button type="button" class="icon-btn" data-dialog-close="batch-summary-dialog" aria-label="Close" data-i18n-aria="batch.closeAria">&times;</button>
+    </div>
+    <div class="dialog-body">
+      <div class="notice"><p id="batch-summary-warning"></p></div>
+      <p class="dialog-status" id="batch-summary-status" role="status" aria-live="polite"></p>
+      <ul class="hint" id="batch-summary-failures"></ul>
+    </div>
+    <div class="dialog-foot">
+      <button type="button" class="btn" data-dialog-close="batch-summary-dialog" value="cancel" data-i18n="dialog.cancel">Cancel</button>
+      <button type="button" class="btn primary" id="batch-summary-start" data-i18n="batch.start">Start</button>
+    </div>
+  </form>
+</dialog>
+<!-- 一句话摘要：人工摘要写 overrides.org（需 Phase 1 接口）；会话自己总结走提示词+打开会话 -->
+<dialog id="summary-dialog" aria-labelledby="summary-title">
+  <form method="dialog" class="dialog-form" id="summary-form">
+    <div class="dialog-head">
+      <div>
+        <h2 id="summary-title" data-i18n="summary.title">One-line summary</h2>
+        <p class="subtle" data-i18n="summary.hint">The conversation writes its own summary (≤50 characters).</p>
+      </div>
+      <button type="button" class="icon-btn" data-dialog-close="summary-dialog" aria-label="Close" data-i18n-aria="summary.closeAria">&times;</button>
+    </div>
+    <div class="dialog-body">
+      <p class="hint" id="summary-target"></p>
+      <label class="field">
+        <span data-i18n="summary.field">Summary (≤50 characters)</span>
+        <input id="summary-text" maxlength="50" autocomplete="off" placeholder="One line about this conversation" data-i18n-placeholder="summary.placeholder">
+      </label>
+      <div class="notice">
+        <strong data-i18n="summary.aiTitle">Let the conversation summarize itself</strong>
+        <p class="hint" data-i18n="summary.aiHint">Copy the prompt below, open the session and send it.</p>
+        <p class="hint"><span data-i18n="summary.promptLabel">Prompt</span></p>
+        <pre class="summary-prompt" id="summary-prompt"></pre>
+        <div class="summary-actions">
+          <button type="button" class="btn small" id="summary-copy" data-i18n="summary.copyPrompt">Copy prompt</button>
+          <button type="button" class="btn small" id="summary-open-session" data-i18n="summary.openSession">Open session</button>
+          <button type="button" class="btn small" id="summary-run" data-i18n="summary.autoSend">Let the conversation summarize itself</button>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <span class="dialog-status" id="summary-status" role="status" aria-live="polite"></span>
+      <button type="button" class="btn" data-dialog-close="summary-dialog" value="cancel" data-i18n="dialog.cancel">Cancel</button>
+      <button type="submit" class="btn primary" id="summary-save" data-i18n="summary.saveHuman">Save human summary</button>
+    </div>
+  </form>
+</dialog>
 <!-- 快速记录：只追加 inbox.org，不触发任何 AI 执行 -->
 <dialog id="capture-dialog" aria-labelledby="capture-title">
   <form method="dialog" class="dialog-form" id="capture-form">

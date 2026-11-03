@@ -40,7 +40,7 @@ dsh-pm 只把会话当**只读输入**，整理成一张张「工作卡」；而
 - 设计与验收的细节记录属于**内部资料，未随仓库发布**；正文里凡引用它们的地方，都写成「内部记录（未随仓库发布）」并给出命令与日期。
 - 给 agent 的 skill（随仓库分发）：[skill/pm/SKILL.md](skill/pm/SKILL.md)；每份 skill 的细节放在相邻的 `references/` 里（按需加载，不塞进主文件）。
 
-> 状态：**v0.3 系列**（最新发布 **v0.3.2**，2026-10-23）；仓库已**公开**：[github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm)。
+> 状态：**v0.3 系列**（最新发布 **v0.3.3**，2026-11-03）；仓库已**公开**：[github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm)。
 > 未完成的东西一律放在文末[路线 / 未完成](#路线--未完成)，不写成已完成。
 
 ## 界面
@@ -239,18 +239,16 @@ role = "explore"
 ### HTTP 路由（插件宿主提供）
 
 路由清单由插件的路由表（`domain-routes.ts`）定义，Web 前端实际调用的端点如下
-（核对方式：`frontend_impl/app.js` 里的调用点。截至 2026-10-12：**34 条域路由 + `cards`/`capture`/`capabilities`，
-另有 4 条 `UNSUPPORTED_ENDPOINTS`**；来源：内部前端评审记录，未随仓库发布）：
+（核对方式：`frontend_impl/app.js` 里的调用点；运行中宿主最终以 `GET /ui-pm/capabilities` 为准）。
 
 | 域 | 端点 |
 |---|---|
 | 卡片 / 宿主 | `GET /ui-pm/cards`、`GET /ui-pm/capabilities`、`GET /ui-pm/events`、`POST /ui-pm/capture` |
 | 收件箱 | `GET /ui-pm/inbox`、`GET /ui-pm/inbox/:id`、`POST /ui-pm/inbox/:id/{archive,snooze,merge,note,dismiss,annotate,edit,pin,unpin}` |
-| 任务 | `GET /ui-pm/tasks`、`GET /ui-pm/tasks/:id`、`GET\|POST /ui-pm/tasks/:id/execution-config`、`POST /ui-pm/tasks/:id/{link-session,unlink-session}`、`GET /ui-pm/tasks/:id/handoff` |
+| 任务 | `GET /ui-pm/tasks`、`GET /ui-pm/tasks/:id`、`GET\|POST /ui-pm/tasks/:id/execution-config`、`POST /ui-pm/tasks/:id/{link-session,unlink-session}`、`GET /ui-pm/tasks/:id/handoff`、`POST /ui-pm/tasks/:id/{dispatch,submit-review,accept,return}` |
 | 提案 | `GET /ui-pm/proposals`、`GET /ui-pm/proposals/:id`、`POST /ui-pm/proposals/:id/{approve,reject,revise}` |
 | 项目 / 工作区 | `GET\|POST /ui-pm/projects`、`GET /ui-pm/projects/:id/context`、`GET\|POST /ui-pm/projects/:key/brief`、`GET /ui-pm/workspaces`、`GET /ui-pm/workspaces/context` |
 | 记忆 | `GET /ui-pm/memory`、`POST /ui-pm/memory/:id/deprecate`、`POST /ui-pm/memory-candidates/:id/{verify,merge,discard}` |
-| **未实现（明确拒绝）** | `POST /ui-pm/tasks/:id/dispatch`、`submit-review`、`accept`、`return`（4 条在 `UNSUPPORTED_ENDPOINTS`，带原因；见[路线](#路线--未完成)） |
 
 写接口都要求带上你看到的版本号（`expectedRevision`，简报是 `expectedDigest`），
 并返回固定的五个字段 `entityId / revision / source / observedAt / auditEventId`；
@@ -258,12 +256,13 @@ role = "explore"
 
 ### MCP 工具（`pm mcp`，stdio）
 
-11 个工具（实测 `src/pm/mcp.py` 的 `TOOLS`，2026-10-23）：
+12 个工具（实测 `src/pm/mcp.py` 的 `TOOLS`，2026-11-03）：
 `projects`、`cards`、`card`、`summary_queue`、`session_log`、`set_summary`、`capture`、
-`pm_recall`、`task_add`、`proposal_draft`、`render`。
+`pm_recall`、`task_add`、`proposal_draft`、`proposal_revise`、`render`。
 
 - `task_add` 只能建 `TODO`/`NEXT`：写 `DONE`/`CANCELLED` 会被明确拒绝（`DONE_REQUIRES_HUMAN`）。
 - `proposal_draft` **只创建提案，绝不创建正式任务**（工具描述里写明）。
+- `proposal_revise` 在 AI/用户对话后修订 PENDING 提案的风险 / 待确认事项 / 变更；保留 ID，只写 `proposals.org`，不创建或派发任务。
 - `capture` 同样返回那五个字段，并落一条审计；它以 MCP（`source=mcp`）身份运行，因此追加到 **AI** 收件箱文件（`inbox-ai-<周期>.org`），从不写人工文件。
 
 ## 诚实契约
@@ -305,7 +304,7 @@ role = "explore"
    └────────────────────────────────────────┬───────────────────────────────────────┘
                                             │  entities.apply_change（版本核对 + 原子写 + 审计 + 防重复提交）
                                             ▼
-        pm CLI（20 个顶层命令） ◄──────► pm MCP server（11 个工具，stdio）
+        pm CLI（20 个顶层命令） ◄──────► pm MCP server（12 个工具，stdio）
                     │                              │
                     └───────► pm ui-cards（稳定 JSON）◄───────┘
                                      │
@@ -335,7 +334,7 @@ src/pm/
   projects.py               项目列表 / 建目录 / 简报（读 + 显式改一段）
   execution.py              执行配置 / 会话关联 / handoff（只描述准备，不派发）
   ui_cards.py               给插件用的 JSON 格式
-  mcp.py                    MCP server（stdio，11 个工具）
+  mcp.py                    MCP server（stdio，12 个工具）
   render/                   org / 表格 / console / 写入计划
   scaffold.py               人工文件模板
 skill/pm/SKILL.md           给 agent 的 skill
@@ -395,26 +394,50 @@ tests/                      单元与集成测试 + 自建 DSH 夹具
 
 ## 路线 / 未完成
 
-**明确标为计划中/进行中，当前不可用**：
+当前发布：**v0.3.3**（2026-11-03）；下一个里程碑是 **v0.4 / P2**。GitHub Issues / Milestones 作为跟踪入口；本节是仓库级摘要。
+
+### 现在 — 0.3.3 后续硬化
+
+| 工作 | 状态 | 说明 |
+|---|---|---|
+| 清 32 条 REVIEW | **进行中** | 多数功能已实现、等人验收；AI 不能写 DONE |
+| 当前 TODO 队列（10 条） | **进行中** | 看板滚动/搜索、SessionStart scope 回退、记忆/提示词页，以及 3 条已批准的随手记绑定任务 |
+| 版本号 + CHANGELOG + README 路线 | **已完成** | 0.3.3 版本号、CHANGELOG 与路线已发布 |
+| 公开发布 | **已完成** | 公开导出、tag `v0.3.3`、GitHub release commit |
+
+### 下一步 — P2 产品功能
+
+| 工作 | 状态 | 说明 |
+|---|---|---|
+| P2-2 Inbox AI 分诊 | **计划中** | 分类 / 优先级 / 转任务建议；绝不自动执行 |
+| P2-3 记忆与决策 LLM 流程 | **计划中** | extract / condense / distill 接入记忆页 |
+| P2-4 多数据根 / 多实例 | **计划中** | 一个 UI 聚合多个 work-memory 根 |
+
+### 更后面 — 平台 / P3
+
+| 工作 | 状态 | 说明 |
+|---|---|---|
+| DSH 派发 outbox | **未实现** | 真正派发、幂等、回执与重试；仍必须由人明确点击才派发 |
+| AI 自评 + 事件时间线聚合 | **计划中** | 仍只存在于内部设计 |
+| 打包与分发 | **计划中** | pipx / PyPI、公开导出、CI 门禁、贡献者协议 |
+| DSH 兼容范围 | **TODO** | 目前只随 DSH 0.2.1-alpha.x 验证过 |
+| 前端框架化 | **暂缓** | 只有 内部记录/10 §4-P3 触发条件满足任意 2 条才启动；当前 vanilla JS |
+
+### 明确未完成（当前缺口）
 
 | 项 | 状态 | 说明 |
 |---|---|---|
-| 界面截图 | **已补（演示库）** | 截图来自自建演示库 `~/dsh-pm-demo`（纯假数据，无真实项目名/路径/会话 ID）；复现命令见[界面](#界面)，全部 7 张见 [docs/screenshots.zh-CN.md](docs/screenshots.zh-CN.md) |
-| 验收脚本里一条静态检查的误判 | **修复中** | 门禁里 1 条 FAIL 是检查本身写得太死（锚点匹配），不是功能缺陷 |
-| 人类文件指纹 vs. 多文件收件箱 | **已完成（2026-10-23）** | C15 现覆盖 `inbox-human-*.org` / `inbox-ai-*.org`（+ 非生成视图的旧 `inbox.org`）、`overrides.org`、`projects/**`；自检含轮转文件负例 |
-| DSH 派发（谁去执行任务；含防重复派发与失败重试） | **未实现** | `POST /ui-pm/tasks/:id/dispatch` 在 `UNSUPPORTED_ENDPOINTS`；执行配置只有「没准备好」（`NOT_READY`）/「可以交接」（`HANDOFF_READY`），不假装已派发 |
-| 专用 `submit-review` / `accept` / `return` 命令 | **未实现** | 现用 `pm task transition` + `actor=human` 等价 |
-| 任务变更历史（把 `:LOGBOOK:` 里记的流水读出来）+ 详情界面 | **已交付** | `pm task show --json` 返回 `history` / `historyCount` / `historyTruncated`，任务详情右栏按时间倒序渲染（缺失字段写「未记录」） |
-| 任务证据（截图 / 链接）、验收标准项的固定编号 | **已交付** | `pm task evidence add/list`（kind / result，不知道就写 `info`）与 `pm task criteria init-ids`（给旧标准补 `c-xxxx`） |
-| AI 自评 + 事件时间线聚合 | **计划中** | 仍只存在于内部设计 |
-| 前端 JS 模块拆分（第二阶段）+ 测试不再依赖读源码文本 | **进行中** | 当前那条静态检查因此报 FAIL |
-| 拖拽/滑动的第三方库替换 | **评估中** | 拖放与横向滚动为自研实现（已可用）；是否换库在评估 |
-| 插件安装的端到端复验 | **进行中** | 安装走 GitHub（见上）；干净 profile 复验未做完 |
-| `pipx` / PyPI 发布 | **计划中** | `pipx install git+https://github.com/SunrShine/dsh-pm` 是目标形态；PyPI 未发布 |
-| `pm.el`（Emacs org-agenda / capture 入口） | **已有**（仓库根 `pm.el`） | 看板跳转、agenda 文件、`C-c a P` 与多文件感知的 org-capture 模板（写当前 `inbox-human-*.org` 并带 `:ID:`）；另有 `pm-capture-inbox` / `pm-inbox-render` / `pm-inbox-open-current`（见 `emacs/README.md`） |
-| 贡献者协议、CI 工作流 | **待补** | 许可已定为 MIT（见下） |
-| 双语 README | **已提供** | `README.md` 为英文主文档，中文见 `README.zh-CN.md`；两份由 `scripts/verify_doc_pairing.py` 成对校验（一侧改了另一侧没跟上会红） |
-| 与其它 DSH 版本的兼容范围 | **TODO** | 目前只随 `0.2.1-alpha.x` 验证过 |
+| 任务动作命令 | **已完成** | dispatch / submit-review / accept / return 已有；dispatch 只准备 HANDOFF_READY，绝不执行 |
+| 任务变更历史与证据 | **已完成** | show --json history、evidence add/list/rm、验收标准稳定 ID |
+| AI 修订提案 | **已完成** | MCP proposal_revise + 提案面板「复制 AI 修改指令」 |
+| UI 回归 smoke | **已完成** | scripts/ui_e2e_smoke.mjs；多视口只读检查 |
+| 插件安装端到端复验 | **进行中** | 干净 profile 复验未完成 |
+| 前端 JS 模块拆分 / 静态检查 | **进行中** | 读源码文本的静态检查还需改为行为判据 |
+| 第三方拖拽/滚动库 | **评估中** | 自研实现可用；是否替换在评估 |
+| 截图与人类文件指纹 | **已完成** | 演示库截图；C15 覆盖轮转 inbox 文件 |
+| Emacs 入口 | **已有** | pm.el + emacs/（agenda、capture、多文件 inbox） |
+
+GitHub 说明：仓库页面没有原生 Roadmap tab。用 **GitHub Projects → Roadmap 视图**（建议 public project），或用更轻的 **Milestones** 挂在 issue 上；两种方式都可以镜像上面的阶段。
 
 ## 许可与第三方
 

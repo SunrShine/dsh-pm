@@ -40,7 +40,7 @@ dsh-pm treats sessions strictly as **read-only input** and distils them into "wo
 - The internal design / convention / acceptance / memo records are **not published with the repository**, so this README never links to them; where they are mentioned, they are called "internal records (not published)" together with the command and the date.
 - The skills shipped to agents: [skill/pm/SKILL.md](skill/pm/SKILL.md); the details of each skill live next to it under `references/` (loaded on demand instead of bloating the main file).
 
-> Status: **v0.3 series** (latest release **v0.3.2**, 2026-10-23); the repository is **public** at [github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm).
+> Status: **v0.3 series** (latest release **v0.3.3**, 2026-11-03); the repository is **public** at [github.com/SunrShine/dsh-pm](https://github.com/SunrShine/dsh-pm).
 > Anything unfinished is listed under [roadmap / not done](#roadmap--not-done) at the end — never written up as done.
 
 ## UI
@@ -231,18 +231,16 @@ role = "explore"
 ### HTTP routes (provided by the plugin host)
 
 The route list is defined by the plugin's route table (`domain-routes.ts`); the endpoints the web frontend actually calls are below
-(check method: the call sites in `frontend_impl/app.js`. As of 2026-10-12: **34 domain routes + `cards`/`capture`/`capabilities`,
-plus 4 `UNSUPPORTED_ENDPOINTS`**; source: internal frontend review records, not published with the repository):
+(check method: the call sites in `frontend_impl/app.js`; `GET /ui-pm/capabilities` is the final authority for what the running host provides).
 
 | Domain | Endpoints |
 |---|---|
 | Cards / host | `GET /ui-pm/cards`, `GET /ui-pm/capabilities`, `GET /ui-pm/events`, `POST /ui-pm/capture` |
 | Inbox | `GET /ui-pm/inbox`, `GET /ui-pm/inbox/:id`, `POST /ui-pm/inbox/:id/{archive,snooze,merge,note,dismiss,annotate,edit,pin,unpin}` |
-| Tasks | `GET /ui-pm/tasks`, `GET /ui-pm/tasks/:id`, `GET\|POST /ui-pm/tasks/:id/execution-config`, `POST /ui-pm/tasks/:id/{link-session,unlink-session}`, `GET /ui-pm/tasks/:id/handoff` |
+| Tasks | `GET /ui-pm/tasks`, `GET /ui-pm/tasks/:id`, `GET\|POST /ui-pm/tasks/:id/execution-config`, `POST /ui-pm/tasks/:id/{link-session,unlink-session}`, `GET /ui-pm/tasks/:id/handoff`, `POST /ui-pm/tasks/:id/{dispatch,submit-review,accept,return}` |
 | Proposals | `GET /ui-pm/proposals`, `GET /ui-pm/proposals/:id`, `POST /ui-pm/proposals/:id/{approve,reject,revise}` |
 | Projects / workspaces | `GET\|POST /ui-pm/projects`, `GET /ui-pm/projects/:id/context`, `GET\|POST /ui-pm/projects/:key/brief`, `GET /ui-pm/workspaces`, `GET /ui-pm/workspaces/context` |
 | Memory | `GET /ui-pm/memory`, `POST /ui-pm/memory/:id/deprecate`, `POST /ui-pm/memory-candidates/:id/{verify,merge,discard}` |
-| **Not implemented (explicitly rejected)** | `POST /ui-pm/tasks/:id/dispatch`, `submit-review`, `accept`, `return` (4 entries in `UNSUPPORTED_ENDPOINTS` with reasons; see [roadmap](#roadmap--not-done)) |
 
 Write endpoints require the revision you saw (`expectedRevision`; the brief uses `expectedDigest`)
 and return the same five fields `entityId / revision / source / observedAt / auditEventId`;
@@ -250,12 +248,13 @@ a revision mismatch → `409` (`exit 3` in the CLI).
 
 ### MCP tools (`pm mcp`, stdio)
 
-11 tools (measured from `TOOLS` in `src/pm/mcp.py`, 2026-10-23):
+12 tools (measured from `TOOLS` in `src/pm/mcp.py`, 2026-11-03):
 `projects`, `cards`, `card`, `summary_queue`, `session_log`, `set_summary`, `capture`,
-`pm_recall`, `task_add`, `proposal_draft`, `render`.
+`pm_recall`, `task_add`, `proposal_draft`, `proposal_revise`, `render`.
 
 - `task_add` can only create `TODO`/`NEXT`: writing `DONE`/`CANCELLED` is explicitly rejected (`DONE_REQUIRES_HUMAN`).
 - `proposal_draft` **only creates a proposal, never a real task** (stated in the tool description).
+- `proposal_revise` updates a PENDING proposal after an AI/user conversation (risks / confirmations / changes); it keeps the ID, writes only `proposals.org`, and never creates or dispatches tasks.
 - `capture` also returns those five fields and records an audit entry; because it runs as MCP (`source=mcp`) it appends to the **AI** inbox file (`inbox-ai-<period>.org`), never to the human one.
 
 ## Honesty contract
@@ -297,7 +296,7 @@ This is where the project spends most of its effort: **rather write "I do not kn
    └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                             │  entities.apply_change (revision check + atomic write + audit + dedup)
                                             ▼
-        pm CLI (20 top-level commands) ◄──────► pm MCP server (11 tools, stdio)
+        pm CLI (20 top-level commands) ◄──────► pm MCP server (12 tools, stdio)
                     │                              │
                     └───────► pm ui-cards (stable JSON) ◄───────┘
                                      │
@@ -327,7 +326,7 @@ src/pm/
   projects.py               project list / scaffold a directory / brief (read + rewrite one section)
   execution.py              execution config / session linking / handoff (describes readiness only, never dispatches)
   ui_cards.py               the JSON shape the plugin consumes
-  mcp.py                    MCP server (stdio, 11 tools)
+  mcp.py                    MCP server (stdio, 12 tools)
   render/                   org / table / console / write plan
   scaffold.py               human-file templates
 skill/pm/SKILL.md           the skill for agents
@@ -386,25 +385,50 @@ The other `scripts/verify_*.py` either read code only or verify against a tempor
 
 ## Roadmap / not done
 
-**Explicitly planned or in progress, and not usable today**:
+Current release: **v0.3.3** (2026-11-03); next milestone is **v0.4 / P2**. GitHub Issues / Milestones are the tracking surface; this section is the repository-level summary.
+
+### Now — post-0.3.3 hardening
+
+| Work | Status | Notes |
+|---|---|---|
+| Clear the 32 REVIEW tasks | **In progress** | Most are implemented features waiting for human acceptance; AI cannot mark DONE |
+| Current TODO queue (10 items) | **In progress** | Kanban scrolling/search, SessionStart scope fallback, memory/prompt pages, and the three approved quick-note binding tasks |
+| Version + CHANGELOG + README roadmap | **Done** | 0.3.3 version bump, CHANGELOG and roadmap are published |
+| Public release | **Done** | Public export, tag `v0.3.3`, GitHub release commit |
+
+### Next — P2 product work
+
+| Work | Status | Notes |
+|---|---|---|
+| P2-2 Inbox AI triage | **Planned** | Classification / priority / conversion suggestion; never auto-executes |
+| P2-3 Memory and decision LLM flow | **Planned** | extract / condense / distill wired into the memory page |
+| P2-4 Multi-root libraries | **Planned** | Multiple work-memory roots / instances in one UI |
+
+### Later — platform / P3
+
+| Work | Status | Notes |
+|---|---|---|
+| DSH dispatch outbox | **Not implemented** | Actual assignment, idempotency, receipts and retry; dispatch must stay an explicit human click |
+| AI self-assessment + aggregated event timeline | **Planned** | Internal design only |
+| Packaging and distribution | **Planned** | pipx / PyPI, public export, CI gate, contributor agreement |
+| DSH compatibility range | **TODO** | Verified against DSH 0.2.1-alpha.x so far |
+| Frontend framework | **Deferred** | Only if the 内部记录/10 §4-P3 trigger conditions are met; vanilla JS for now |
+
+### Explicitly not done (current gaps)
 
 | Item | Status | Notes |
 |---|---|---|
-| UI screenshots | **Done (demo library)** | Captured from a self-built demo library `~/dsh-pm-demo` (pure fake data; no real project names/paths/session ids); reproduce with the commands in [UI](#ui) |
-| One static check in the acceptance script mis-firing | **Being fixed** | The single FAIL in the gate is the check itself being too rigid (anchor matching), not a functional defect |
-| Human-file fingerprint vs. the multi-file inbox | **Done (2026-10-23)** | C15 now fingerprints `inbox-human-*.org` / `inbox-ai-*.org` (+ a legacy non-generated `inbox.org`), `overrides.org` and `projects/**`; its self-test covers a rotation file too |
-| DSH dispatch (who executes a task; including dedup and retry) | **Not implemented** | `POST /ui-pm/tasks/:id/dispatch` sits in `UNSUPPORTED_ENDPOINTS`; execution config only has "not ready" (`NOT_READY`) / "ready for handoff" (`HANDOFF_READY`) and never pretends to have dispatched |
-| Dedicated `submit-review` / `accept` / `return` commands | **Not implemented** | `pm task transition` + `actor=human` is the equivalent today |
-| Task change history (reading the `:LOGBOOK:` trail) + a detail view | **Done** | `pm task show --json` returns `history` / `historyCount` / `historyTruncated`, and the task detail pane renders it (newest first; missing fields read "not recorded") |
-| Task evidence (screenshots / links) and stable IDs for acceptance criteria | **Done** | `pm task evidence add/list` (kind / result, `info` when unknown) and `pm task criteria init-ids` (backfills `c-xxxx` IDs) |
-| AI self-assessment + an aggregated event timeline | **Planned** | Still internal-design-only |
-| Frontend JS module split (phase 2) + tests no longer reading source text | **In progress** | That static check currently reports the FAIL |
-| Replacing drag/scroll with a third-party library | **Under evaluation** | Drag-and-drop and horizontal scrolling are home-grown (and usable); whether to switch is being evaluated |
-| End-to-end re-verification of plugin installation | **In progress** | Installation goes through GitHub (above); a clean-profile re-verification is unfinished |
-| `pipx` / PyPI publishing | **Planned** | `pipx install git+https://github.com/SunrShine/dsh-pm` is the target form; PyPI is not published |
-| `pm.el` (an Emacs org-agenda / capture entry point) | **Available** (repo root `pm.el`) | Left sidebar entry, agenda files, `C-c a P`, and a multi-file-aware org-capture template (writes the current `inbox-human-*.org` with `:ID:`); also `pm-capture-inbox` / `pm-inbox-render` / `pm-inbox-open-current` (see `emacs/README.md`) |
-| Contributor agreement, CI workflow | **To be added** | The licence is settled as MIT (below) |
-| Compatibility range with other DSH versions | **TODO** | So far only verified against `0.2.1-alpha.x` |
+| Task-action commands | **Done** | dispatch / submit-review / accept / return exist; dispatch only prepares HANDOFF_READY and never executes |
+| Task change history and evidence | **Done** | show --json history, evidence add/list/rm, stable criterion IDs |
+| Proposal revise by AI | **Done** | MCP proposal_revise + "copy AI revise prompt" in the proposal pane |
+| UI regression smoke | **Done** | scripts/ui_e2e_smoke.mjs; multi-viewport read-only checks |
+| Plugin installer end-to-end re-verification | **In progress** | Clean-profile re-verification is unfinished |
+| Frontend JS module split / static check | **In progress** | The source-text static check still needs to become behaviour-based |
+| Third-party drag/scroll library | **Evaluating** | Home-grown implementation works; replacement is being evaluated |
+| Screenshots and human-file fingerprint | **Done** | Demo-library screenshots; C15 covers rotation inbox files |
+| Emacs entry point | **Available** | pm.el + emacs/ (agenda, capture, multi-file inbox) |
+
+GitHub note: a repository page has no native Roadmap tab. Use **GitHub Projects → Roadmap layout** (public project recommended) or, for a lighter public view, **Milestones** linked from issues; both can mirror the phases above.
 
 ## License and third parties
 

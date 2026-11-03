@@ -275,7 +275,11 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     if (!isFinite(v) || v <= 0) v = DETAIL_W_DEFAULT;
     var vw = Number(viewportWidth);
     if (!isFinite(vw) || vw <= 0) vw = 1440;
-    var max = Math.min(DETAIL_W_ABS_MAX, vw - DETAIL_W_CHROME);
+    /* 右栏/窄面板里没有 250px 导航常驻，vw - 610 会把上限压到 320 完全不可调；
+       窄视口按 92vw 给抽屉上限（与 CSS 的 width:min(var(--pm-detail-w),92vw) 对齐）。 */
+    var max = vw <= 1280
+      ? Math.min(DETAIL_W_ABS_MAX, Math.round(vw * 0.92))
+      : Math.min(DETAIL_W_ABS_MAX, vw - DETAIL_W_CHROME);
     if (max < DETAIL_W_MIN) max = DETAIL_W_MIN;
     return Math.round(Math.min(Math.max(v, DETAIL_W_MIN), max));
   }
@@ -367,9 +371,26 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
 
   /* ================= 工作卡（AI 工作卡）片段 ================= */
 
+  function sessionName(c) {
+    return String(c.session_name || c.session_title || '').trim();
+  }
+
   function cardTitle(c) {
-    if (c.summary) return c.summary;
-    return '（未生成一句话摘要）';
+    return sessionName(c) || t('card.untitledSession');
+  }
+
+  function cardSummaryText(c) {
+    return c.summary || t('card.summaryMissing');
+  }
+
+  function summarySourceText(c) {
+    var source = c.summary_source === 'ai'
+      ? t('det.summarySourceAi')
+      : format(t('det.summarySourceOther'), { s: c.summary_source });
+    var meta = [];
+    if (c.summary_generated_by) meta.push(String(c.summary_generated_by));
+    if (c.summary_generated_at) meta.push(localTime(c.summary_generated_at) || String(c.summary_generated_at));
+    return meta.length ? source + ' · ' + meta.join(' · ') : source;
   }
 
   function cardSourceLine(c) {
@@ -379,19 +400,24 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
 
   function rowHtml(c) {
     var arch = isArchived(c);
+    var summaryButton = '<button type="button" class="btn small" data-card-summary="' + esc(c.session_id) +
+      '" data-instance="' + esc(c.instance) + '">' +
+      esc(c.summary ? t('card.updateSummary') : t('card.generateSummary')) + '</button>';
     return '<div class="item' + (arch ? ' is-dim' : '') + '">' +
       '<div class="item-main">' +
       '<button type="button" class="item-title link" data-session="' + esc(c.session_id) + '"' +
       ' data-instance="' + esc(c.instance) + '">' + esc(cardTitle(c)) + '</button>' +
+      '<div class="item-summary' + (c.summary ? '' : ' is-missing') + '">' + esc(cardSummaryText(c)) + '</div>' +
       '<div class="item-meta">' +
       '<span>' + esc(c.project) + '</span>' +
-      obsBadge(c) + instChip(c) + archChip(c) + summaryChip(c) +
+      obsBadge(c) + instChip(c) + archChip(c) +
       '<span>' + esc(format(t('row.turnsSteps'), { turns: c.turns, steps: c.steps })) + '</span>' +
       (c.open_todos ? '<span>' + esc(format(t('row.openTodos'), { n: c.open_todos })) + '</span>' : '') +
       '<span>' + esc(format(t('proj.observed'), { time: relTime(c.recorded_at) })) + '</span>' +
       '</div></div>' +
-      '<div class="item-side"><button type="button" class="btn small" data-open-session="' + esc(c.session_id) +
-      '" data-instance="' + esc(c.instance) + '">' + esc(t('row.openSession')) + '</button></div></div>';
+      '<div class="item-side"><div class="item-actions">' + summaryButton +
+      '<button type="button" class="btn small" data-open-session="' + esc(c.session_id) +
+      '" data-instance="' + esc(c.instance) + '">' + esc(t('row.openSession')) + '</button></div></div></div>';
   }
 
   function agentCardHtml(c) {
@@ -401,6 +427,7 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
       '<span class="subtle" style="font-size:11.5px">' + esc(t('ag.observedPrefix')) + esc(relTime(c.recorded_at)) + '</span></div>' +
       '<button type="button" class="agent-title' + (arch ? '' : ' link') + '" data-session="' + esc(c.session_id) +
       '" data-instance="' + esc(c.instance) + '">' + esc(cardTitle(c)) + '</button>' +
+      '<div class="agent-summary' + (c.summary ? '' : ' is-missing') + '">' + esc(cardSummaryText(c)) + '</div>' +
       (c.open_todos
         ? '<div class="agent-action">' + esc(format(t('ag.todosOpen'), { n: c.open_todos, total: c.total_todos })) + '</div>'
         : '<div class="agent-action">' + esc(format(t('ag.noOpenTodos'), { t: c.turns, s: c.steps })) + '</div>') +
@@ -449,7 +476,7 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     return '<div class="quick-wrap">' +
       /* task-76：关掉浏览器的表单历史/自动填充建议（form 级 + 控件级 + 中性 name） */
       '<form class="quick" id="' + id + '" autocomplete="off">' +
-      '<textarea id="quick" name="pm-quick-capture" rows="3" class="quick-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
+      '<textarea id="quick" name="pm-quick-capture" rows="6" class="quick-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
       'data-i18n-placeholder="quick.placeholder" placeholder="' + esc(t('quick.placeholder')) + '" aria-label="' + esc(t('quick.ariaLabel')) + '"></textarea>' +
       '<div class="quick-actions"><button class="btn primary" type="submit">' + esc(t('quick.submit')) + '</button></div></form>' +
       '<p class="hint" data-i18n="qn.hint">' + esc(t('qn.hint')) + '</p>' +
@@ -494,7 +521,8 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     withTasks.slice(0, 8).forEach(function (p) {
       var c = p.counts || {};
       var nexts = ((c.todo || {}).tasks || []).slice(0, 2);   /* task-56：NEXT 归入 todo */
-      html += '<div class="item"><div class="item-main"><div class="item-title">' + esc(p.project) + '</div>' +
+      html += '<div class="item" data-project="' + esc(p.project) + '" role="button" tabindex="0"' +
+        ' title="' + esc(t('board.openProject')) + '"><div class="item-main"><div class="item-title">' + esc(p.project) + '</div>' +
         '<div class="item-meta">' +
         (function () {
           /* 5 列 key 优先；其它 key 追加在后面 —— 数据驱动，不再写死列名 */
@@ -510,8 +538,7 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
         html += '<button type="button" class="item-title link" style="margin-top:6px" data-task-id="' + esc(item.id) + '"' +
           ' data-task-project="' + esc(p.project) + '">' + esc(item.title) + '</button>';
       });
-      html += '</div><div class="item-side"><button type="button" class="btn small" data-project="' +
-        esc(p.project) + '">' + esc(t('board.openProject')) + '</button></div></div>';
+      html += '</div></div>';   /* 整卡可点：不再单独放「打开项目」按钮 */
     });
     if (withTasks.length > 8) html += '<div class="notice">' + esc(format(t('board.moreProjects'), { n: (withTasks.length - 8) })) + '</div>';
     html += '</div></section>';
@@ -594,22 +621,40 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
   }
 
   /* 点卡片条目 → 跳收件箱并选中；若当前有状态过滤把这个 id 滤掉了，先清过滤再选 */
+  function revealInboxEntry(id) {
+    selectNoteById(id);
+    render();
+    /* render() 会重建列表；等这一帧结束后把选中行滚到可视区，而不是停在页面顶端。 */
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(function () {
+        var row = el.content.querySelector('.note.selected');
+        if (row && row.scrollIntoView) {
+          try { row.scrollIntoView({ block: 'center' }); } catch (e) {}
+        }
+        var main = row && row.querySelector('.note-main');
+        if (main && main.focus) { try { main.focus({ preventScroll: true }); } catch (e) {} }
+      });
+    }
+  }
+
   function openInboxEntry(id) {
     if (!id) return;
     go('inbox');
+    var any = findAnyInboxEntry(id);
     var found = (state.inbox && state.inbox.entries || []).some(function (e) { return e.id === id; });
-    if (!found && state.inboxStatus) {
-      state.inboxStatus = '';
-      loadInbox().then(function () { selectNoteById(id); render(); });
+    var hiddenByDefault = !!(any && state.inboxStatus === '' && defaultViewEntries([any]).length === 0);
+    var hiddenByOrigin = !!(any && state.inboxOrigin && noteOrigin(any) !== state.inboxOrigin);
+    var hiddenBySearch = !!(state.q && String(any && any.text || '').toLowerCase().indexOf(state.q.trim().toLowerCase()) < 0);
+    if (!found || hiddenByDefault || hiddenByOrigin || hiddenBySearch) {
+      /* 置顶表可能指向 ARCHIVED/延期条目，或当前筛选/搜索把它藏了：
+         先切「全部状态」+ 清来源/搜索，再选并滚动到它。 */
+      state.inboxStatus = '*';
+      state.inboxOrigin = '';
+      state.q = '';
+      loadInbox().then(function () { revealInboxEntry(id); });
       return;
     }
-    /* 来源筛选是纯客户端过滤：条目还在内存里、只是被来源滤掉 ⇒ 先清来源再选，
-       否则右栏选中了、列表里却看不见这条（与上面状态过滤的处理口径一致）。 */
-    if (found && state.inboxOrigin && !filteredEntries().some(function (x) { return x.e.id === id; })) {
-      state.inboxOrigin = '';
-    }
-    selectNoteById(id);
-    render();
+    revealInboxEntry(id);
   }
 
   function viewBoard() {
@@ -663,10 +708,13 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     var changes = p.changes || [];
     var criteria = 0;
     changes.forEach(function (c) { criteria += (c.criteria || []).length; });
+    var pending = p.status === 'PENDING';
+    var statusClass = pending ? 'amber' : (p.status === 'APPROVED' ? 'green' : 'gray');
+    var statusText = pending ? t('pr.pending') : String(p.status || '—');
     return '<button type="button" class="card-row' + (sel ? ' selected' : '') + '" data-proposal-id="' + esc(p.id) + '">' +
       '<span class="card-title">' + esc(p.title || t('pr.noTitle')) + '</span>' +
       '<span class="task-row">' +
-      '<span class="badge amber">' + esc(t('pr.pending')) + '</span>' +
+      '<span class="badge ' + statusClass + '">' + esc(statusText) + '</span>' +
       (p.project ? '<span class="chip">' + esc(p.project) + '</span>'
                  : '<span class="chip dashed" title="' + esc(t('pr.noProjectTitle')) + '">' + esc(t('pr.noProject')) + '</span>') +
       '<span class="chip">' + esc(format(t('pr.changesN'), { n: changes.length })) + '</span>' +
@@ -728,12 +776,16 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
   function attentionRowHtml(c) {
     var reasons = attentionReasons(c);
     var suggest = attentionSuggestion(c);
+    var summaryButton = '<button type="button" class="btn small" data-card-summary="' + esc(c.session_id) +
+      '" data-instance="' + esc(c.instance) + '">' +
+      esc(c.summary ? t('card.updateSummary') : t('card.generateSummary')) + '</button>';
     return '<div class="item is-attention">' +
       '<div class="item-main">' +
       '<button type="button" class="item-title link" data-session="' + esc(c.session_id) + '"' +
       ' data-instance="' + esc(c.instance) + '">' + esc(cardTitle(c)) + '</button>' +
+      '<div class="item-summary' + (c.summary ? '' : ' is-missing') + '">' + esc(cardSummaryText(c)) + '</div>' +
       '<div class="item-meta">' +
-      '<span>' + esc(c.project) + '</span>' + obsBadge(c) + instChip(c) + summaryChip(c) +
+      '<span>' + esc(c.project) + '</span>' + obsBadge(c) + instChip(c) +
       '<span>' + esc(format(t('att.observedAt'), { t: relTime(c.recorded_at) })) + '</span>' +
       '</div>' +
       (reasons.length
@@ -741,12 +793,15 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
         : '<p class="attention-why subtle">' + esc(t('att.whyUnknown')) + '<code>observation</code>' + esc(t('att.whyUnknown2')) + '<code>open_todos</code>' + esc(t('att.whyUnknown3')) + '</p>') +
       (suggest ? '<p class="attention-next">' + esc(suggest) + '</p>' : '') +
       '</div>' +
-      '<div class="item-side"><button type="button" class="btn small" data-open-session="' + esc(c.session_id) +
-      '" data-instance="' + esc(c.instance) + '">' + esc(t('row.openSession')) + '</button></div></div>';
+      '<div class="item-side"><div class="item-actions">' + summaryButton +
+      '<button type="button" class="btn small" data-open-session="' + esc(c.session_id) +
+      '" data-instance="' + esc(c.instance) + '">' + esc(t('row.openSession')) + '</button></div></div></div>';
   }
 
   function attentionPanel(attention, missingCount) {
-    var props = (state.proposals && state.proposals.items) || [];
+    var allProps = (state.proposals && state.proposals.items) || [];
+    var props = allProps.filter(function (p) { return p.status === 'PENDING'; });
+    var history = allProps.filter(function (p) { return p.status !== 'PENDING'; });
     var propError = state.proposals && state.proposals.error;
     var html = '<section class="panel"><div class="panel-head"><div><h2>' + esc(t('panel.needsMe')) + '</h2>' +
       '<p class="subtle">' + esc(t('att.panelHint')) + '</p></div>' +
@@ -770,6 +825,15 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
         esc(t('att.proposalsExplainA')) + '</span></div>';
     } else {
       props.forEach(function (p) { html += proposalRowHtml(p); });
+    }
+    if (history.length) {
+      html += '<details class="needsme-history" style="margin-top:12px">' +
+        '<summary class="group-head needsme-toggle" style="cursor:pointer">' +
+        esc(t('panel.proposalHistory')) +
+        ' <span class="badge gray">' + history.length + '</span></summary>' +
+        '<div style="margin-top:8px">';
+      history.slice(0, 30).forEach(function (p) { html += proposalRowHtml(p); });
+      html += '</div></details>';
     }
 
     html += '<button type="button" class="group-head needsme-toggle" style="margin-top:16px" data-needsme-toggle="cards" aria-expanded="' + (nms.cardsCollapsed ? 'false' : 'true') + '">' +
@@ -1727,7 +1791,8 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
       state.proposals = { items: [], error: unavailableReason('GET', '/ui-pm/proposals') };
       return Promise.resolve();
     }
-    return httpJson(api('proposals', { status: 'PENDING' })).then(function (x) {
+    /* 一次读全部：待批准走上面的列表，已批准/已拒绝放进下面的历史；不再单独请求。 */
+    return httpJson(api('proposals')).then(function (x) {
       if (x.ok && x.body.ok === true) {
         state.proposals = { items: (x.body.data || {}).proposals || [], error: null };
       } else {
@@ -2678,6 +2743,7 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     if (!p) return newProjectNoteHtml() + '<div class="panel"><div class="empty">' + esc(format(t('proj.notFound'), { key: key })) + '</div></div>';
     var cards = state.data.cards.filter(function (c) { return c.project === key; });
     var archived = cards.filter(isArchived);
+    var missingSummary = cards.filter(function (c) { return c.summary_source === 'not_generated' && !isArchived(c); });
     var board = (state.board && state.board.project === key) ? state.board : null;
     var counts = boardCounts(board);
 
@@ -2728,7 +2794,11 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
       html += '<section class="panel"><div class="panel-head"><div><h2>' + esc(t('tab.cards')) + '</h2>' +
         '<p class="subtle">' + esc(t('proj.cardsNote')) + '</p></div>' +
         '<span class="subtle" style="font-size:12px">' + esc(format(t('proj.cardCount'), { n: cards.length })) +
-        (archived.length ? esc(format(t('proj.archivedCount'), { n: archived.length })) : '') + '</span></div>' +
+        (archived.length ? esc(format(t('proj.archivedCount'), { n: archived.length })) : '') +
+        (missingSummary.length
+          ? ' <button type="button" class="btn small" data-batch-summary="' + esc(key) + '">' +
+            esc(format(t('proj.batchSummary'), { n: missingSummary.length })) + '</button>'
+          : '') + '</span></div>' +
         '<div class="panel-body">';
       if (!cards.length) html += '<div class="empty">' + esc(t('proj.noCards')) + '</div>';
       var rank = function (c) { return isArchived(c) ? 2 : (c.needs_attention ? 0 : 1); };
@@ -3860,11 +3930,15 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
 
     html += '<div class="detail-section"><h3>' + esc(t('det.summaryHeading')) + '</h3>' +
       (c.summary
-        ? '<p>' + esc(c.summary) + '</p><p class="hint">' + esc(c.summary_source === 'ai' ? t('det.summarySourceAi') : format(t('det.summarySourceOther'), { s: c.summary_source })) + '</p>'
+        ? '<p>' + esc(c.summary) + '</p><p class="hint">' + esc(summarySourceText(c)) + '</p>'
         : '<p class="subtle">' + esc(format(t('det.summaryNone'), { s: c.summary_source || 'not_generated' })) + '</p>') +
-      '</div>';
+      '<div class="summary-actions" style="margin-top:8px">' +
+      '<button type="button" class="btn small" data-card-summary="' + esc(c.session_id) + '" data-instance="' + esc(c.instance) + '">' +
+      esc(c.summary ? t('card.updateSummary') : t('card.generateSummary')) + '</button>' +
+      '</div></div>';
 
     html += '<div class="detail-section"><h3>' + esc(t('det.factsHeading')) + '</h3><div class="kv">' +
+      '<b>' + esc(t('det.kvSessionName')) + '</b><span>' + esc(cardTitle(c)) + '</span>' +
       '<b>' + esc(t('det.kvProject')) + '</b><span>' + esc(c.project) + '</span>' +
       '<b>' + esc(t('det.kvInstance')) + '</b><span>' + esc(c.instance) + '</span>' +
       '<b>' + esc(t('det.kvTurns')) + '</b><span>' + esc(format(t('det.turnsSteps'), { t: c.turns, s: c.steps })) + '</span>' +
@@ -4664,6 +4738,57 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
     });
   }
 
+  /** P2-1 A：显式动作按钮走专用路由；不伪造“已启动/已派发”。 */
+  function taskOp(op, project, id, revision) {
+    var endpoint = 'POST /ui-pm/tasks/:id/' + op;
+    if (!endpointListed('POST', endpoint)) {
+      surfaceNotice(unavailableReason('POST', endpoint) || t('det.patchNotReady'));
+      return;
+    }
+    var needsReason = op === 'return';
+    var labels = {
+      dispatch: t('det.dispatch'),
+      'submit-review': t('det.submitReview'),
+      accept: t('det.acceptTask'),
+      return: t('det.returnTask')
+    };
+    var body = '<div class="kv">' +
+      '<b>' + esc(t('det.taskHead')) + '</b><span>' + esc(id) + '</span>' +
+      '<b>revision</b><span>' + esc(String(revision)) + '</span></div>' +
+      (op === 'dispatch' ? '<p class="hint">' + esc(t('det.dispatchHint')) + '</p>' : '') +
+      (needsReason ? '<p class="hint">' + esc(t('det.opReturnHint')) + '</p>' : '') +
+      reasonField(t('det.opReason'), t('det.opReasonPlaceholder'), needsReason) +
+      '<p class="hint">POST ' + esc(endpoint.replace('POST ', '')) + '</p>';
+    openConfirmDialog({
+      title: t('det.opTitle'),
+      note: '',
+      body: body,
+      okLabel: labels[op] || op,
+      onOk: function () {
+        var reasonEl = document.getElementById('confirm-reason');
+        var reason = reasonEl ? reasonEl.value.trim() : '';
+        if (needsReason && !reason) {
+          var st = document.getElementById('confirm-status');
+          st.className = 'dialog-status err';
+          setFieldError(st, t('det.opReason'), reasonEl);
+          document.getElementById('confirm-dialog').showModal();
+          return;
+        }
+        performWrite({
+          slot: 'task-op|' + id + '|' + op,
+          method: 'POST',
+          path: 'tasks/' + encodeURIComponent(id) + '/' + op,
+          revision: revision,
+          body: { project: project, reason: reason },
+          label: labels[op] || op,
+          ident: id,
+          afterOk: function () { return reloadTaskViews(project, id); },
+          afterConflict: function () { return reloadTaskViews(project, id); }
+        });
+      }
+    });
+  }
+
   function openTaskCreate(project) {
     var dlg = document.getElementById('task-dialog');
     /* 项目 key 存在 state 里（不从文本反推）；表单上也留一份便于调试/测试 */
@@ -4902,13 +5027,37 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
 
   function taskActionBlock(task, project, allowDone) {
     var canWrite = endpointListed('PATCH', '/ui-pm/tasks/:id');
-    var all = allowedTargets(task.status);
+    var status = String(task.status || '');
+    var canDispatch = endpointListed('POST', '/ui-pm/tasks/:id/dispatch');
+    var canSubmitReview = endpointListed('POST', '/ui-pm/tasks/:id/submit-review');
+    var canAccept = endpointListed('POST', '/ui-pm/tasks/:id/accept');
+    var canReturn = endpointListed('POST', '/ui-pm/tasks/:id/return');
+    var all = allowedTargets(status);
     var targets = allowDone ? all : all.filter(function (x) { return x !== 'DONE'; });
+    if (canAccept) targets = targets.filter(function (x) { return x !== 'DONE'; });
+    if (canSubmitReview && status === 'DOING') targets = targets.filter(function (x) { return x !== 'REVIEW'; });
+    if (canReturn && status === 'REVIEW') targets = targets.filter(function (x) { return x !== 'DOING'; });
     var html = '';
-    if (!canWrite) {
+    if (!canWrite && !canDispatch && !canSubmitReview && !canAccept && !canReturn) {
       html += '<p class="hint">' + esc(unavailableReason('PATCH', '/ui-pm/tasks/:id') || t('det.patchNotReady')) + '</p>';
     }
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    if (canDispatch && allowedTargets(status).indexOf('DOING') >= 0) {
+      html += '<button type="button" class="btn small primary" data-task-op="dispatch" data-task-op-revision="' +
+        esc(String(task.revision)) + '">' + esc(t('det.dispatch')) + '</button>';
+    }
+    if (canSubmitReview && status === 'DOING') {
+      html += '<button type="button" class="btn small primary" data-task-op="submit-review" data-task-op-revision="' +
+        esc(String(task.revision)) + '">' + esc(t('det.submitReview')) + '</button>';
+    }
+    if (canAccept && status === 'REVIEW') {
+      html += '<button type="button" class="btn small primary" data-task-op="accept" data-task-op-revision="' +
+        esc(String(task.revision)) + '">' + esc(t('det.acceptTask')) + '</button>';
+    }
+    if (canReturn && status === 'REVIEW') {
+      html += '<button type="button" class="btn small" data-task-op="return" data-task-op-revision="' +
+        esc(String(task.revision)) + '">' + esc(t('det.returnTask')) + '</button>';
+    }
     if (!targets.length) html += '<span class="hint">' + esc(t('det.noTransitions')) + '</span>';
     /* task-80：「验收通过（已完成）」是首要动作（primary、排最前）；其余合法边保持次要 */
     var ordered = targets.slice().sort(function (a, b) {
@@ -5522,6 +5671,8 @@ import { performWrite, mintKey, configureWrite } from './pm-write.js';
       html += canRevise
         ? '<button type="button" class="btn" data-proposal-revise="' + esc(p.id) + '">' + esc(t('dfp.reviseBtn')) + '</button>'
         : notYet('修改', missingEndpointText('POST', '/ui-pm/proposals/:id/revise'));
+      /* AI 对话后修改：复制一条带 ID/revision 的指令，用户粘进会话即可让 AI 调 proposal_revise */
+      html += '<button type="button" class="btn" data-proposal-ai-edit="' + esc(p.id) + '">' + esc(t('dfp.aiEditBtn')) + '</button>';
     }
     html += '</div><p class="hint">批准会在 <b>' + esc(p.project || '所选项目') + '</b> 创建 ' + changes.length +
       ' 条正式任务，并把源随手记标记为「任务已创建（TASK_CREATED）」；拒绝不改变正式任务。</p></div>';
@@ -6411,6 +6562,7 @@ return html;
     }
     el.detailTitle.textContent = title;
     el.detailBody.innerHTML = html;
+    wireDetail();
   }
 
   /* ================= 渲染与路由 ================= */
@@ -6753,6 +6905,97 @@ return html;
     }
   }
 
+  /* ---------- 一句话摘要：人工写 / 让会话自己写 ---------- */
+  var summaryTarget = null;
+
+  function summaryCard(sessionId) {
+    return state.data.cards.filter(function (c) { return c.session_id === sessionId; })[0] || null;
+  }
+
+  function summaryPromptFor(card) {
+    var library = (state.data && state.data.library) ? String(state.data.library) : '<work-memory>';
+    var cmd = 'pm summary set --root ' + library +
+      ' --session ' + card.session_id + ' --instance ' + card.instance +
+      ' --text "<不超过50字的摘要>"';
+    return format(t('summary.aiPrompt'), { cmd: cmd });
+  }
+
+  function openSummaryDialog(sessionId, instance) {
+    var dlg = document.getElementById('summary-dialog');
+    if (!dlg) return;
+    var card = summaryCard(sessionId);
+    summaryTarget = { sessionId: sessionId, instance: instance || (card ? card.instance : '') };
+    var name = card ? cardTitle(card) : sessionId;
+    document.getElementById('summary-target').textContent = format(t('summary.target'), { name: name + ' · ' + sessionId });
+    document.getElementById('summary-text').value = (card && card.summary) ? card.summary : '';
+    document.getElementById('summary-prompt').textContent = summaryPromptFor({
+      session_id: sessionId, instance: instance || (card ? card.instance : '')
+    });
+    var status = document.getElementById('summary-status');
+    status.textContent = '';
+    status.className = 'dialog-status';
+    var auto = document.getElementById('summary-run');
+    if (auto) {
+      var embedded = window.parent !== window;
+      auto.disabled = !embedded;
+      auto.title = embedded ? '' : t('summary.autoUnavailable');
+    }
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    var input = document.getElementById('summary-text');
+    if (input && input.focus) { try { input.focus(); input.select(); } catch (e) {} }
+  }
+
+  function closeSummaryDialog() {
+    var dlg = document.getElementById('summary-dialog');
+    if (!dlg) return;
+    if (dlg.open) { try { dlg.close(); } catch (e) { dlg.removeAttribute('open'); } }
+  }
+
+  function copyClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return Promise.reject(new Error('clipboard unavailable'));
+  }
+
+  function saveHumanSummary(target, text) {
+    var status = document.getElementById('summary-status');
+    var summary = String(text || '').trim();
+    if (summary.length > 50) {
+      status.className = 'dialog-status err';
+      status.textContent = t('summary.tooLong');
+      return Promise.resolve(false);
+    }
+    if (!endpointListed('POST', '/ui-pm/cards/:session/summary')) {
+      status.className = 'dialog-status err';
+      status.textContent = t('summary.noEndpoint');
+      return Promise.resolve(false);
+    }
+    var url = new URL('../cards/' + encodeURIComponent(target.sessionId) + '/summary', location.href).toString();
+    status.className = 'dialog-status';
+    status.textContent = t('summary.saving');
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ summary: summary, instance: target.instance })
+    }).then(function (r) {
+      return r.json().then(function (b) {
+        if (!r.ok || !b || b.ok !== true) {
+          throw new Error((b && b.error) || ('HTTP ' + r.status));
+        }
+        return b;
+      });
+    }).then(function () {
+      status.className = 'dialog-status ok';
+      status.textContent = t('summary.saved');
+      closeSummaryDialog();
+      syncCardNames();
+      return true;
+    }).catch(function (err) {
+      status.className = 'dialog-status err';
+      status.textContent = format(t('summary.saveFailed'), { err: err.message || String(err) });
+      return false;
+    });
+  }
+
   function copyPath(path) {
     var ok = function () { el.sync.textContent = t('sx.copiedPath') + path; };
     var fail = function () { el.sync.textContent = t('sx.copyPathFailed'); };
@@ -6781,15 +7024,170 @@ return html;
     return { actionable: actionable, focused: !!target };
   }
 
+  /* ---------- 摘要异步回写：宿主结果 / 批量刷新 ---------- */
+  var promptWaiters = {};
+
+  function requestSummaryPrompt(sessionId, instance, prompt, open) {
+    return new Promise(function (resolve) {
+      if (window.parent === window) { resolve(t('summary.autoUnavailable')); return; }
+      var timer = setTimeout(function () {
+        delete promptWaiters[sessionId];
+        resolve('timeout waiting for the DSH host');
+      }, 20000);
+      promptWaiters[sessionId] = function (error) {
+        clearTimeout(timer);
+        delete promptWaiters[sessionId];
+        resolve(error || null);
+      };
+      window.parent.postMessage({
+        type: 'pm-run-prompt',
+        sessionId: sessionId,
+        instance: instance,
+        prompt: prompt,
+        open: open !== false
+      }, '*');
+    });
+  }
+
+  var summaryRefreshTimers = [];
+  function scheduleSummaryRefresh() {
+    summaryRefreshTimers.forEach(function (timer) { clearTimeout(timer); });
+    summaryRefreshTimers = [];
+    [4000, 12000, 30000, 60000].forEach(function (ms) {
+      summaryRefreshTimers.push(setTimeout(function () { syncCardNames(); }, ms));
+    });
+  }
+
+  var batchCards = [];
+  var batchRunning = false;
+
+  function openBatchSummary(projectKey) {
+    var dlg = document.getElementById('batch-summary-dialog');
+    if (!dlg) return;
+    batchCards = (state.data.cards || []).filter(function (c) {
+      return c.project === projectKey && c.summary_source === 'not_generated' && !isArchived(c);
+    });
+    var hint = document.getElementById('batch-summary-hint');
+    var warning = document.getElementById('batch-summary-warning');
+    var status = document.getElementById('batch-summary-status');
+    var failures = document.getElementById('batch-summary-failures');
+    var start = document.getElementById('batch-summary-start');
+    status.textContent = '';
+    status.className = 'dialog-status';
+    failures.innerHTML = '';
+    batchRunning = false;
+    if (!batchCards.length) {
+      hint.textContent = t('batch.none');
+      warning.textContent = '';
+      start.disabled = true;
+    } else {
+      hint.textContent = format(t('batch.hint'), { n: batchCards.length });
+      warning.textContent = t('batch.warning');
+      start.disabled = false;
+    }
+    if (window.parent === window) {
+      start.disabled = true;
+      status.textContent = t('batch.embedOnly');
+      status.className = 'dialog-status err';
+    }
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+
+  function startBatchSummary() {
+    if (batchRunning || !batchCards.length) return;
+    batchRunning = true;
+    var start = document.getElementById('batch-summary-start');
+    var status = document.getElementById('batch-summary-status');
+    var failures = document.getElementById('batch-summary-failures');
+    start.disabled = true;
+    var total = batchCards.length;
+    var done = 0;
+    var ok = 0;
+    var fail = 0;
+    function update() {
+      status.className = 'dialog-status';
+      status.textContent = format(t('batch.running'), { done: done, total: total, fail: fail });
+    }
+    function next(i) {
+      if (i >= total) {
+        status.className = 'dialog-status ' + (fail ? 'err' : 'ok');
+        status.textContent = format(t('batch.done'), { ok: ok, fail: fail });
+        batchRunning = false;
+        if (ok) scheduleSummaryRefresh();
+        return;
+      }
+      var card = batchCards[i];
+      requestSummaryPrompt(card.session_id, card.instance, summaryPromptFor(card), false).then(function (err) {
+        done += 1;
+        if (err) {
+          fail += 1;
+          var li = document.createElement('li');
+          li.textContent = format(t('batch.failItem'), { name: cardTitle(card), err: String(err) });
+          failures.appendChild(li);
+        } else {
+          ok += 1;
+        }
+        update();
+        setTimeout(function () { next(i + 1); }, 300);
+      });
+    }
+    update();
+    next(0);
+  }
+
+  var cardSyncInFlight = null;
+
+  /* 点开工作卡：展开详情并拉一次最新 /cards（DSH 改了会话名，点开时同步）。 */
+  function selectCard(id) {
+    state.card = id;
+    ensureDetailOpen();
+    renderDetail();
+    syncCardNames();
+  }
+
+  /* 只刷新工作卡投影：名字/摘要变了不影响当前视图片段。失败不覆盖已显示的卡。 */
+  function syncCardNames() {
+    if (cardSyncInFlight) return cardSyncInFlight;
+    cardSyncInFlight = fetch(cardsUrl(true), { headers: { accept: 'application/json' }, cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (body) {
+        if (!body || body.ok !== true) return;
+        state.data = body.data;
+        el.sync.textContent = t('sync.read') + ' ' + localTime(body.data.generated_at) + t('sync.snapshot');
+        render();
+      })
+      .catch(function () { /* 同步失败保留旧名字，不打断当前详情 */ })
+      .then(function () { cardSyncInFlight = null; });
+    return cardSyncInFlight;
+  }
+
+  /* 详情栏每次重绘后重新绑定（只绑当前 DOM）。 */
+  function wireDetail() {
+    if (!el.detailBody) return;
+    el.detailBody.querySelectorAll('[data-session]').forEach(function (node) {
+      node.addEventListener('click', function () {
+        openSession(node.getAttribute('data-session'), node.getAttribute('data-instance'));
+      });
+    });
+    el.detailBody.querySelectorAll('[data-open-session]').forEach(function (node) {
+      node.addEventListener('click', function () {
+        openSession(node.getAttribute('data-open-session'), node.getAttribute('data-instance'));
+      });
+    });
+    el.detailBody.querySelectorAll('[data-card-summary]').forEach(function (node) {
+      node.addEventListener('click', function () {
+        openSummaryDialog(node.getAttribute('data-card-summary'), node.getAttribute('data-instance'));
+      });
+    });
+  }
+
   function wire() {
     /* 选中工作卡 → 第三栏详情 */
     el.content.querySelectorAll('[data-session]').forEach(function (node) {
       node.addEventListener('click', function () {
         var id = node.getAttribute('data-session');
         if (node.classList.contains('agent-title') || node.classList.contains('item-title')) {
-          state.card = id;
-          ensureDetailOpen();   /* P2：点会话卡 ⇒ 展开右栏（否则收起状态下点了没反应 ✗）*/
-          renderDetail();
+          selectCard(id);
         } else {
           openSession(id, node.getAttribute('data-instance'));
         }
@@ -6802,16 +7200,33 @@ return html;
       });
     });
 
-    /* 详情栏里的「打开 DSH 会话」 */
-    el.detailBody.querySelectorAll('[data-session]').forEach(function (node) {
+    el.content.querySelectorAll('[data-card-summary]').forEach(function (node) {
       node.addEventListener('click', function () {
-        openSession(node.getAttribute('data-session'), node.getAttribute('data-instance'));
+        openSummaryDialog(node.getAttribute('data-card-summary'), node.getAttribute('data-instance'));
       });
     });
 
+    el.content.querySelectorAll('[data-batch-summary]').forEach(function (node) {
+      node.addEventListener('click', function () { openBatchSummary(node.getAttribute('data-batch-summary')); });
+    });
+
+    /* 详情栏的按钮由 renderDetail() 内的 wireDetail() 绑定（内容会随后重绘，不能在这里绑定）。 */
+
     /* 键盘可达：项目标题是按钮；点卡片空白处也能进（鼠标便利） */
     el.content.querySelectorAll('[data-project]').forEach(function (node) {
-      node.addEventListener('click', function () { ensureDetailOpen(); go('projects', node.getAttribute('data-project')); });   /* P2：进项目页时右栏项目详情自动展开 ✓ */
+      var openProject = function () {
+        ensureDetailOpen();
+        go('projects', node.getAttribute('data-project'));   /* P2：进项目页时右栏项目详情自动展开 ✓ */
+      };
+      node.addEventListener('click', function (e) {
+        /* 卡内嵌套的任务标题/操作按钮保持原行为，不要把项目页也一起打开 */
+        if (e.target !== node && e.target.closest && e.target.closest('button, a, input, select, textarea, [data-task-id]')) return;
+        openProject();
+      });
+      node.addEventListener('keydown', function (e) {
+        if (e.target !== node) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openProject(); }
+      });
     });
     el.content.querySelectorAll('[data-project-card]').forEach(function (node) {
       node.addEventListener('click', function (e) {
@@ -7254,6 +7669,14 @@ return html;
           render();
         });
       });
+      root.querySelectorAll('[data-task-op]').forEach(function (node) {
+        node.addEventListener('click', function () {
+          var d = state.taskDetail;
+          if (!state.task || !d || !d.task) return;
+          taskOp(node.getAttribute('data-task-op'), state.task.project, state.task.id,
+            parseInt(node.getAttribute('data-task-op-revision'), 10));
+        });
+      });
       root.querySelectorAll('[data-transition-to]').forEach(function (node) {
         node.addEventListener('click', function () {
           var d = state.taskDetail;
@@ -7491,6 +7914,25 @@ return html;
         node.addEventListener('click', function () {
           var p = findProposal(node.getAttribute('data-proposal-revise'));
           if (p) openProposalEditor(p);
+        });
+      });
+      root.querySelectorAll('[data-proposal-ai-edit]').forEach(function (node) {
+        node.addEventListener('click', function () {
+          var p = findProposal(node.getAttribute('data-proposal-ai-edit'));
+          if (!p) return;
+          var riskLines = (p.risks || []).map(function (r) { return '- ' + r; }).join('\n');
+          var actionLines = (p.actions || []).map(function (a) { return '- ' + a; }).join('\n');
+          var prompt = '请先读提案 ' + p.id + '（当前 revision ' + p.revision + '，plan rev ' + p.plan_revision + '）。\n' +
+            '请根据我们刚才的对话，更新它的「风险与待确认」以及必要的变更计划；\n' +
+            '使用 pm 的 proposal_revise 工具（MCP）或 CLI：pm proposal revise ' + p.id + ' --expected-revision ' + p.revision + ' --risk ... --action ... --json；\n' +
+            '不要创建正式任务、不要派发执行。修改后告诉我新的 revision。\n\n' +
+            '当前风险：\n' + (riskLines || '（无）') + '\n\n当前待确认/操作：\n' + (actionLines || '（无）');
+          var done = function () { if (el.sync) el.sync.textContent = t('dfp.aiEditCopied'); };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(prompt).then(done, function () { window.prompt(t('dfp.aiEditBtn'), prompt); });
+          } else {
+            window.prompt(t('dfp.aiEditBtn'), prompt);
+          }
         });
       });
       root.querySelectorAll('[data-proposal-reject]').forEach(function (node) {
@@ -8557,6 +8999,72 @@ return html;
   });
 
   var capDialog = document.getElementById('capture-dialog');
+  var summaryRun = document.getElementById('summary-run');
+  if (summaryRun) summaryRun.addEventListener('click', function () {
+    if (!summaryTarget) return;
+    var status = document.getElementById('summary-status');
+    var target = summaryTarget;
+    var prompt = document.getElementById('summary-prompt').textContent || '';
+    if (window.parent === window) {
+      status.className = 'dialog-status err';
+      status.textContent = t('summary.autoUnavailable');
+      return;
+    }
+    status.className = 'dialog-status';
+    status.textContent = t('summary.autoSending');
+    summaryRun.disabled = true;
+    requestSummaryPrompt(target.sessionId, target.instance, prompt, true).then(function (err) {
+      summaryRun.disabled = false;
+      if (err) {
+        status.className = 'dialog-status err';
+        status.textContent = format(t('summary.autoFailed'), { err: String(err) });
+      } else {
+        status.className = 'dialog-status ok';
+        status.textContent = t('summary.autoSent');
+        scheduleSummaryRefresh();
+      }
+    });
+  });
+  window.addEventListener('message', function (ev) {
+    var data = ev.data;
+    if (!data || data.type !== 'pm-run-prompt-result') return;
+    var waiter = promptWaiters[data.sessionId];
+    if (waiter) waiter(data.error || null);
+  });
+  var batchForm = document.getElementById('batch-summary-form');
+  if (batchForm) batchForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    startBatchSummary();
+  });
+  var batchStart = document.getElementById('batch-summary-start');
+  if (batchStart) batchStart.addEventListener('click', startBatchSummary);
+
+  var summaryForm = document.getElementById('summary-form');
+  if (summaryForm) summaryForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!summaryTarget) return;
+    saveHumanSummary(summaryTarget, document.getElementById('summary-text').value);
+  });
+  var summaryCopy = document.getElementById('summary-copy');
+  if (summaryCopy) summaryCopy.addEventListener('click', function () {
+    var prompt = document.getElementById('summary-prompt').textContent || '';
+    var status = document.getElementById('summary-status');
+    copyClipboard(prompt).then(function () {
+      status.className = 'dialog-status ok';
+      status.textContent = t('summary.copyOk');
+    }).catch(function () {
+      status.className = 'dialog-status err';
+      status.textContent = t('summary.copyFailed');
+    });
+  });
+  var summaryOpen = document.getElementById('summary-open-session');
+  if (summaryOpen) summaryOpen.addEventListener('click', function () {
+    if (!summaryTarget) return;
+    var target = summaryTarget;
+    closeSummaryDialog();
+    openSession(target.sessionId, target.instance);
+  });
+
   document.getElementById('capture-form').addEventListener('submit', function (e) {
     var submitter = e.submitter;
     if (!submitter || submitter.value !== 'ok') return;

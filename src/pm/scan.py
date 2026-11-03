@@ -78,9 +78,15 @@ def group_agents(
     agents: Iterable[Agent],
     registry: WorkspaceRegistry,
     config: Config,
+    project_paths: dict[str, dict[str, str]] | None = None,
 ) -> tuple[dict[str, Project], list[Agent], list[Agent]]:
-    """按「项目 key」归组 agent；返回 (项目表, 未登记, 已忽略)。"""
+    """按「项目 key」归组 agent；返回 (项目表, 未登记, 已忽略)。
+
+    `project_paths` 是库内项目按路径显式声明的映射（`projects.path_index`）：
+    DSH 工作区改名后仍按路径归回原项目，而不是只按标题 slug 另起一个项目。
+    """
     merge_index = config.merge_index()
+    project_paths = project_paths or {}
     alias_index = config.alias_index()
     workspace_by_path = {normalize_path(ws.path): ws for ws in registry.workspaces}
     excluded = {normalize_path(p) for p in config.exclude_paths}
@@ -102,6 +108,9 @@ def group_agents(
         elif cwd in alias_index:
             key = alias_index[cwd]
             title = key
+        elif cwd in project_paths:
+            key = project_paths[cwd]["key"]
+            title = project_paths[cwd].get("title") or key
         else:
             workspace = workspace_by_path.get(cwd)
             if workspace is None:
@@ -182,7 +191,7 @@ def scan(
     limit: int = 8,
     source_instances: tuple[str, ...] = (),
 ) -> ScanResult:
-    """组装最终视图（纯函数）。
+    """组装最终视图。
 
     limit 是「噪声预算」的执行手段：每个项目默认最多显示 limit 行，
     多出来的在项目标题下折算成一行提示，而不是把终端刷满。
@@ -211,7 +220,12 @@ def scan(
         reverse=True,
     )
 
-    projects, unregistered, ignored = group_agents(cache.agents, registry, config)
+    project_paths: dict[str, dict[str, str]] = {}
+    if config.library is not None:
+        from pm.projects import path_index
+
+        project_paths = path_index(config.library)
+    projects, unregistered, ignored = group_agents(cache.agents, registry, config, project_paths)
     result.unregistered = unregistered
     result.ignored = ignored
 

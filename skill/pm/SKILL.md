@@ -49,7 +49,7 @@ whenToUse: 用户说"记录一下""更新进展""××项目做到哪了""帮我�
 | 会话摘要（人工版优先） | `overrides.org` | 人写；AI 用 `pm summary set` |
 | 日记 | `journal/YYYY-MM-DD.org` | 人写 |
 
-## 常用命令（v0.3.2）
+## 常用命令（v0.3.3）
 
 ```sh
 pm scan [--all] [--limit N] [--project KEY] [--instance ID] [--json]   # 只读：工作卡现状

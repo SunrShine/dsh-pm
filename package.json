@@ -1,7 +1,7 @@
 {
   "name": "dsh-pm",
   "description": "Work-memory panel: list work cards that need attention and jump to their Session Unofficial: the npm package named dsh-pm is not this project.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -25,7 +25,9 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-sidebar",
-        "@deepseek-ai/dsh-client-ui-workspace"
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
       ],
       "platform": "web"
     },
@@ -45,9 +47,11 @@
     "@deepseek-ai/cordis": "4.0.5-alpha.1",
     "@deepseek-ai/dsh-api-session-controller": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-api-workspace-controller": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-locale": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-layout": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-sidebar": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-workspace": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-host-webserver": "0.2.1-alpha.2",

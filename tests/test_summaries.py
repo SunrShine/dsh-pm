@@ -14,6 +14,8 @@ from pm.summaries import (
     render_ai_file,
     resolve,
     upsert_ai_summary,
+    upsert_human_summary,
+    validate_human_summary,
 )
 
 HUMAN_DOC = """#+TITLE: 人工覆盖
@@ -139,6 +141,48 @@ class RoundTripTest(unittest.TestCase):
             "dsh-default/a": SummaryEntry("dsh-default/a", "A", AI),
         }
         self.assertEqual(render_ai_file(entries), render_ai_file(dict(reversed(list(entries.items())))))
+
+
+class HumanSummaryWriteTest(unittest.TestCase):
+    """UI 保存人工摘要（2026-10-29 用户授权）：只写 overrides.org，不碰 AI 摘要。"""
+
+    SESSION = "session-11111111-1111-1111-1111-111111111111"
+
+    def test_creates_block_and_round_trips(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = upsert_human_summary(root, identity_key="preview/" + self.SESSION, text="  一句话   摘要  ")
+            self.assertTrue(path.is_file())
+            entry = load_human(root)["preview/" + self.SESSION]
+            self.assertEqual(entry.text, "一句话 摘要")
+            self.assertEqual(entry.source, HUMAN)
+
+    def test_updates_existing_block_in_place(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            upsert_human_summary(root, identity_key="preview/" + self.SESSION, text="第一版")
+            upsert_human_summary(root, identity_key="preview/" + self.SESSION, text="第二版")
+            text = (root / "overrides.org").read_text(encoding="utf-8")
+            self.assertEqual(text.count("** " + self.SESSION), 1)
+            self.assertEqual(load_human(root)["preview/" + self.SESSION].text, "第二版")
+
+    def test_does_not_touch_other_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            raw = HUMAN_DOC
+            (root / "overrides.org").write_text(raw, encoding="utf-8")
+            upsert_human_summary(root, identity_key="preview/" + self.SESSION, text="新增")
+            text = (root / "overrides.org").read_text(encoding="utf-8")
+            self.assertIn("人工摘要 A", text)
+            self.assertIn("人工摘要 B", text)
+            self.assertEqual(load_human(root)["preview/" + self.SESSION].text, "新增")
+
+    def test_rejects_empty_and_too_long(self) -> None:
+        with self.assertRaises(ValueError):
+            validate_human_summary("   ")
+        with self.assertRaises(ValueError):
+            validate_human_summary("字" * 51)
+        self.assertEqual(validate_human_summary("字" * 50), "字" * 50)
 
 
 if __name__ == "__main__":

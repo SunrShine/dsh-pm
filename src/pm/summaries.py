@@ -156,6 +156,127 @@ def render_ai_file(entries: dict[str, SummaryEntry]) -> str:
     return render_text(lines)
 
 
+#: 人工摘要的字数上限（用户 2026-10-29 裁定：一句话 ≤50 字）。
+HUMAN_MAX_CHARS = 50
+
+
+def normalize_summary_text(text: object) -> str:
+    """把任意输入压成一行摘要文本（折叠空白；不截断）。"""
+    return " ".join(str(text or "").split())
+
+
+def validate_human_summary(text: object, *, max_chars: int = HUMAN_MAX_CHARS) -> str:
+    """校验人工摘要：非空、不超过 max_chars 个字符。"""
+    cleaned = normalize_summary_text(text)
+    if not cleaned:
+        raise ValueError("EMPTY_SUMMARY: 一句话摘要不能为空")
+    if len(cleaned) > max_chars:
+        raise ValueError(f"SUMMARY_TOO_LONG: 摘要 {len(cleaned)} 字，超过上限 {max_chars}")
+    return cleaned
+
+
+def _split_identity(identity_key: str) -> tuple[str, str]:
+    instance, _, session = str(identity_key).partition("/")
+    if not session:
+        instance, session = "dsh-default", instance
+    if not instance or not session:
+        raise ValueError("INVALID_IDENTITY: 需要 instance/session")
+    return instance, session
+
+
+def _level2_blocks(lines: list[str]):
+    """按 org 二级标题切块：yield (start, end, props, end_props_line)。"""
+    i = 0
+    while i < len(lines):
+        level, _title = _split_headline(lines[i])
+        if level == 1:
+            i += 1
+            continue
+        if level != 2:
+            i += 1
+            continue
+        start = i
+        j = i + 1
+        props: dict[str, str] = {}
+        end_props: int | None = None
+        while j < len(lines):
+            lvl, _ = _split_headline(lines[j])
+            if lvl and lvl <= 2:
+                break
+            stripped = lines[j].strip()
+            if stripped == ":END:":
+                end_props = j
+            elif end_props is None and stripped.startswith(":") and ": " in stripped:
+                name, _, value = stripped[1:].partition(":")
+                props[name.strip().upper()] = value.strip()
+            j += 1
+        yield start, j, props, end_props
+        i = j
+
+
+def _human_header() -> list[str]:
+    return [
+        "#+TITLE: 人工覆盖",
+        "",
+        "* 说明",
+        "  这个文件由人维护；pm 只读。UI 明确保存人工摘要时，只追加/更新对应的摘要条目。",
+        "",
+        "* 卡片摘要覆盖",
+    ]
+
+
+def upsert_human_summary(
+    root: Path,
+    *,
+    identity_key: str,
+    text: str,
+    max_chars: int = HUMAN_MAX_CHARS,
+) -> Path:
+    """写入/更新一条人工摘要（overrides.org）；人工摘要优先，永不被自动摘要覆盖。"""
+    instance, session = _split_identity(identity_key)
+    cleaned = validate_human_summary(text, max_chars=max_chars)
+    path = Path(root) / HUMAN_FILE
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        raw = ""
+    lines = raw.splitlines() if raw else _human_header()
+    replaced = False
+    for start, end, props, end_props in _level2_blocks(lines):
+        if props.get("PM_SESSION") != session or props.get("PM_SOURCE_INSTANCE", "dsh-default") != instance:
+            continue
+        body_line = None
+        cursor = (end_props + 1) if end_props is not None else start + 1
+        while cursor < end:
+            stripped = lines[cursor].strip()
+            if stripped and not stripped.startswith("#"):
+                body_line = cursor
+                break
+            cursor += 1
+        if body_line is not None:
+            indent = lines[body_line][: len(lines[body_line]) - len(lines[body_line].lstrip())]
+            lines[body_line] = indent + cleaned
+        else:
+            insert_at = (end_props + 1) if end_props is not None else end
+            lines.insert(insert_at, "   " + cleaned)
+        replaced = True
+        break
+    if not replaced:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.extend([
+            "** " + session,
+            "   :PROPERTIES:",
+            "   :PM_SOURCE_INSTANCE: " + instance,
+            "   :PM_SESSION: " + session,
+            "   :PM_SUMMARY_SOURCE: human",
+            "   :END:",
+            "   " + cleaned,
+        ])
+    write_atomic(path, "\n".join(lines).rstrip() + "\n")
+    return path
+
+
 def upsert_ai_summary(
     root: Path,
     *,

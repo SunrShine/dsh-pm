@@ -301,7 +301,7 @@ nav .count{margin-left:auto;color:var(--pm-sidebar-muted);font-size:12px;font-va
 .top-row .quick-col{display:flex;min-width:0;flex-direction:column}
 .top-row .quick-wrap{margin:0;flex:1;display:flex;flex-direction:column}
 .top-row .quick-wrap form.quick{flex:1;display:flex;flex-direction:column}
-.top-row .quick-wrap textarea.quick-input{flex:1;min-height:110px;resize:vertical}
+.top-row .quick-wrap textarea.quick-input{flex:1;min-height:180px;resize:vertical}
 /* 右卡「置顶随手记」限高（列表可滚动）：否则它一长，左卡被拉伸 ⇒ 输入框变成一大片空白 ✗
    用户口径：输入框"增大一些"但**不要留太大空隙** ⇒ 左右卡都在 ~240px 量级，输入框 ~150px ✓ */
 .top-row .notes-card .panel-body{max-height:170px}
@@ -332,14 +332,15 @@ nav .count{margin-left:auto;color:var(--pm-sidebar-muted);font-size:12px;font-va
 }
 .notes-legacy{margin-top:8px;padding-top:8px;border-top:1px dashed var(--pm-border);color:var(--pm-muted);font-size:11.5px}
 .notes-foot{display:flex;justify-content:flex-end;margin-top:8px}
-@media (max-width:1100px){.top-row{grid-template-columns:1fr}}
+@media (max-width:1280px){.top-row{grid-template-columns:1fr}}
+@media (max-width:1280px){.top-row .quick-wrap textarea.quick-input{min-height:200px}}
 
 /* ================= 快速记录 ================= */
 .quick-wrap{margin:12px 0 20px}
 .quick{display:flex;gap:10px}
 /* 库任务 ②：随手记改为多行输入（可见高度 > 一行、可纵向拉伸）+ 等宽字体（org 语法对齐） */
 .quick{flex-direction:column;align-items:stretch}
-.quick textarea.quick-input{width:100%;min-height:72px;resize:vertical;
+.quick textarea.quick-input{width:100%;min-height:140px;resize:vertical;
   font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:13px;line-height:1.55;
   border:1px solid var(--pm-border);border-radius:11px;padding:12px 14px;background:var(--pm-card);color:inherit}
 .quick textarea.quick-input:focus{border-color:var(--pm-accent);box-shadow:0 0 0 3px var(--pm-blue-soft);outline:none}
@@ -366,12 +367,22 @@ nav .count{margin-left:auto;color:var(--pm-sidebar-muted);font-size:12px;font-va
 .item{display:flex;align-items:flex-start;gap:12px;padding:12px 8px;border-radius:10px}
 .item + .item{border-top:1px solid var(--pm-border)}
 .item:hover{background:var(--pm-surface-2)}
+.item[data-project]{cursor:pointer}
+.item[data-project]:focus-visible{outline:2px solid var(--pm-accent);outline-offset:2px}
 .item-main{min-width:0;flex:1}
 .item-title{font-weight:650;line-height:1.45;word-break:break-word}
 .item-title.link{cursor:pointer;color:var(--pm-accent);text-decoration:underline;text-underline-offset:2px;text-align:left}
 button.item-title{display:block;padding:0;font-size:14px}
 .item-meta{color:var(--pm-muted);font-size:11.5px;margin-top:5px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 .item-side{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.item-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.item-summary{margin-top:4px;font-size:12.5px;color:var(--pm-text);line-height:1.45;word-break:break-word}
+.item-summary.is-missing{color:var(--pm-muted)}
+.agent-summary{margin-top:4px;font-size:12.5px;color:var(--pm-text);line-height:1.45}
+.agent-summary.is-missing{color:var(--pm-muted)}
+.summary-prompt{margin:6px 0 8px;padding:8px 10px;background:var(--pm-surface-alt,transparent);border:1px solid var(--pm-border);border-radius:6px;white-space:pre-wrap;font-size:12px;line-height:1.5;max-height:180px;overflow:auto}
+.summary-actions{display:flex;gap:8px;flex-wrap:wrap}
+
 .item.is-dim{opacity:.55}
 .item.selected{background:var(--pm-blue-soft);border-radius:10px}
 
@@ -502,6 +513,24 @@ textarea:focus,select:focus,input[type="text"]:focus,input[type="date"]:focus{bo
 .kanban-fold summary{cursor:pointer;color:var(--pm-muted);font-size:12px;padding:4px 2px}
 .kanban-fold summary:focus-visible{outline:2px solid var(--pm-accent);outline-offset:2px}
 .kanban-fold[open] summary{margin-bottom:6px}
+/* 窄面板（含 <900px 的单栏）统一把详情当右侧抽屉：打开时覆盖内容，关闭恢复全宽。
+   否则单栏布局会把详情排到页面很下方，点「处理这条」看起来像没反应。 */
+@media (max-width:1280px){
+  .shell .detail-resizer{display:none!important}
+  .shell:not(.detail-collapsed) .detailbar{
+    display:block!important;position:fixed;top:0;right:0;bottom:0;left:auto;
+    width:min(var(--pm-detail-w,380px),92vw);max-height:none;z-index:100;
+    border-left:1px solid var(--pm-border);
+    box-shadow:-12px 0 30px rgba(0,0,0,.28);
+    background:var(--pm-surface-2);padding:18px 16px 28px;
+  }
+  /* 窄面板下也保留拖拽：把手贴在抽屉左边缘，拖左变宽、拖右变窄；双击复位 */
+  .shell:not(.detail-collapsed) .detail-resizer{
+    display:block!important;position:fixed;left:auto;top:0;bottom:0;
+    right:min(var(--pm-detail-w,380px),92vw);width:10px;height:auto;margin-right:-5px;
+    z-index:101;cursor:col-resize;background:transparent;border:0;
+  }
+}
 @media (max-width:900px){.kanban-col{flex:0 0 220px}}
 .task-card{display:flex;flex-direction:column;background:var(--pm-surface);
   border:1px solid var(--pm-border);border-left:4px solid var(--pm-accent);border-radius:8px;margin:8px 0;overflow:hidden}
@@ -659,7 +688,21 @@ dialog::backdrop{background:rgba(16,24,39,.42)}
 .dialog-status.err{color:var(--pm-red)}
 .dialog-status.ok{color:var(--pm-green)}
 
-/* ================= 响应式：900px 以下单栏 ================= */
+/* ================= 响应式：901–1280px（右栏 PM 面板）=================
+   右栏嵌入时 PM 页只有 ~900px：250px 导航 + 380px 详情会把中列压到 300px。
+   这一段把导航收成 48px 图标条、详情收起，让随手记/卡片占满宽度；
+   >1280px（主面板/全屏）保持原三栏，≤900px 仍走下方单栏规则。 */
+@media (min-width:901px) and (max-width:1280px){
+  .shell,.shell.detail-collapsed,.shell.detail-wide{grid-template-columns:48px minmax(0,1fr)!important}
+  .shell .detail-resizer{display:none!important}
+  .shell .sidebar{padding:14px 4px;overflow-y:auto;overflow-x:hidden}
+  .shell .brand{padding:4px 0 16px;justify-content:center;flex-wrap:wrap;gap:0}
+  .shell .brand-text,.shell .nav-text,.shell .nav-label,.shell .aside-note,
+  .shell nav .count,.shell .sidebar-toggle{display:none}
+  .shell nav button{justify-content:center;gap:0;padding:11px 6px;font-size:17px}
+  .shell .topbar{padding:16px 16px 8px}
+  .shell .content{padding:6px 14px 32px}
+}
 @media (max-width:900px){
   .shell,.shell.detail-collapsed,.shell.detail-wide{grid-template-columns:1fr}
   .detail-resizer{display:none}
@@ -761,6 +804,11 @@ dialog::backdrop{background:rgba(16,24,39,.42)}
 @media (prefers-reduced-motion: reduce){.task-card.task-flash{animation:none;box-shadow:0 0 0 2px var(--pm-accent)}}
 
 /* ===== task-184：「需要我处理」折叠 + 分组 + 逐字理由 ===== */
+.needsme-history summary{cursor:pointer;list-style:none}
+.needsme-history summary::-webkit-details-marker{display:none}
+.needsme-history summary:hover{background:var(--pm-surface-2);border-radius:8px}
+.needsme-history[open] summary{margin-bottom:4px}
+
 .needsme-toggle{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:0;
   color:inherit;cursor:pointer;padding:2px 0;font:inherit}
 .needsme-toggle:hover{color:var(--pm-accent)}

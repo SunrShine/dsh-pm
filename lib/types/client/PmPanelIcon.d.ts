@@ -6,6 +6,6 @@
  * @returns the card-stack glyph.
  */
 export declare function PmPanelIcon({ size }: {
-    readonly size: number;
+    readonly size?: number | undefined;
 }): import("react").JSX.Element;
 //# sourceMappingURL=PmPanelIcon.d.ts.map

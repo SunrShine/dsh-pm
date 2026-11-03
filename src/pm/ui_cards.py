@@ -35,7 +35,7 @@
 诚实性约束（与 model.py 一致）：
 - 只输出**缓存观察值** observation，不输出"正在运行"。
 - 摘要缺失时 summary 为 null、summary_source 为 "not_generated"，
-  不拿 DSH 自动标题冒充摘要。
+  不拿 DSH 自动标题冒充摘要；AI 摘要另给 summary_generated_at/by（人工摘要通常为 null）。
 
 聚合口径：
 1. 先按视图过滤（默认排除子 agent，--include-subagents 保留全部）；
@@ -119,6 +119,8 @@ def _card(
         "observation_label": OBSERVATION_LABEL.get(observation, observation.value),
         "summary": summary or None,
         "summary_source": agent.summary_status,
+        "summary_generated_at": agent.resolved_summary_generated_at or None,
+        "summary_generated_by": agent.resolved_summary_generated_by or None,
         "turns": agent.turns,
         "steps": agent.steps,
         "recorded_at": _iso(agent.last_active),

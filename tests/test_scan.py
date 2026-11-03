@@ -41,6 +41,41 @@ def run(case: unittest.TestCase, **kw):
     return scan(config=config, registry=registry, cache=cache, now=NOW, **kw)
 
 
+class LibraryPathMappingTest(unittest.TestCase):
+    """2026-10-30：库内项目的 #+PM_PATH: 优先于 DSH 工作区标题 slug。"""
+
+    def test_workspace_title_change_keeps_library_project_key(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        home = fixtures.build_dsh_home(Path(tmp.name) / "dsh")
+        library = Path(tmp.name) / "library"
+        project_dir = library / "projects" / "proj-pm_tools"
+        project_dir.mkdir(parents=True)
+        (project_dir / "project.org").write_text(
+            "#+TITLE: PM Tools\n#+PM_PATH: " + fixtures.ALPHA + "\n"
+            "* PM Tools\n:PROPERTIES:\n:PM_KEY: pm_tools\n:END:\n",
+            encoding="utf-8",
+        )
+        config = Config(
+            dsh_home=home,
+            library=library,
+            active_days=14,
+            active_hours=24,
+            exclude_paths=("/home/tester",),
+            row_limit=8,
+        )
+        registry = dsh_workspace.load(home)
+        cache = dsh_projcache.load(
+            home / "storages" / "session_projcache" / "sessions",
+            archived_ids=registry.archived_session_ids,
+            title_for_path=registry.title_for_path,
+        )
+        result = scan(config=config, registry=registry, cache=cache, now=NOW)
+        project = next(p for p in result.projects if p.key == "pm_tools")
+        self.assertEqual(project.title, "PM Tools")
+        self.assertEqual(project.paths, [fixtures.ALPHA])
+
+
 class GroupingTest(unittest.TestCase):
     def test_merge_rule_and_buckets(self) -> None:
         result = run(self)

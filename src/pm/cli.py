@@ -41,7 +41,16 @@ from pm.library_view import attach_library_summaries
 from pm.render import console
 from pm.render import plan as plan_mod
 from pm.render.plan import HUMAN, WriteOp, resolve_summaries
-from pm.summaries import AI_FILE, HUMAN_FILE, load_ai, load_human, resolve, upsert_ai_summary
+from pm.summaries import (
+    AI_FILE,
+    HUMAN_FILE,
+    load_ai,
+    load_human,
+    normalize_summary_text,
+    resolve,
+    upsert_ai_summary,
+    upsert_human_summary,
+)
 from pm.scan import ScanResult, scan as run_scan
 from pm.scaffold import plan_for as scaffold_plan
 from pm.ui_cards import build_cards_payload, build_envelope
@@ -326,6 +335,16 @@ def build_parser() -> argparse.ArgumentParser:
     setter.add_argument("--model", default="", help="生成者标识，写入来源信息")
     _add_common_options(setter, as_defaults=True)
     setter.set_defaults(handler=_command_summary_set)
+    human_setter = summary_sub.add_parser(
+        "set-human", help="写入/更新人工摘要（overrides.org；人工摘要优先，永不被自动覆盖）"
+    )
+    human_setter.add_argument("--root", metavar="PATH", default=None, help="work-memory 根（默认取配置里的 library）")
+    human_setter.add_argument("--session", metavar="ID", required=True)
+    human_setter.add_argument("--instance", metavar="ID", default=None, help="数据实例，不给则自动解析")
+    human_setter.add_argument("--text", required=True, help="一句话摘要（≤50 字）")
+    human_setter.add_argument("--json", action="store_true")
+    _add_common_options(human_setter, as_defaults=True)
+    human_setter.set_defaults(handler=_command_summary_set_human)
 
     log = sub.add_parser("log", help="读会话日志，提炼进展材料（只打印，不落库）")
     log.add_argument("--session", metavar="ID", help="单个会话 id")
@@ -920,12 +939,18 @@ def _resolve_instance_id(config: Config, session: str) -> str | None:
 
 
 def _command_summary_set(args: argparse.Namespace) -> int:
-    layout = Layout(Path(args.root))
+    config, _ = load_config(getattr(args, "config", None))
+    if getattr(args, "root", None):
+        layout = Layout(Path(args.root))
+    elif config.library is not None:
+        layout = Layout(Path(config.library))
+    else:
+        print("未配置 work-memory library：加 --root 或配置 pm.toml", file=sys.stderr)
+        return 2
     if not layout.root.is_dir():
         print(f"根目录不存在: {layout.root}", file=sys.stderr)
         return 2
     session = args.session if args.session.startswith("session-") else f"session-{args.session}"
-    config, _ = load_config(getattr(args, "config", None))
     instance = args.instance or _resolve_instance_id(config, session)
     if instance is None:
         candidates = ", ".join(i.id for i in config.effective_instances)
@@ -940,6 +965,41 @@ def _command_summary_set(args: argparse.Namespace) -> int:
     print(f"已写入 {path}")
     print(f"  {key}")
     print(f"  {args.text}")
+    return 0
+
+
+def _command_summary_set_human(args: argparse.Namespace) -> int:
+    """写人工摘要：只改 overrides.org 里对应条目；不碰 AI 摘要。"""
+    config, _ = load_config(getattr(args, "config", None))
+    if getattr(args, "root", None):
+        layout = Layout(Path(args.root))
+    elif config.library is not None:
+        layout = Layout(Path(config.library))
+    else:
+        print("未配置 work-memory library：加 --root 或配置 pm.toml", file=sys.stderr)
+        return 2
+    if not layout.root.is_dir():
+        print(f"根目录不存在: {layout.root}", file=sys.stderr)
+        return 2
+    session = args.session if args.session.startswith("session-") else f"session-{args.session}"
+    instance = args.instance or _resolve_instance_id(config, session)
+    if instance is None:
+        candidates = ", ".join(i.id for i in config.effective_instances)
+        print(f"无法确定 {session} 属于哪个数据根（已查: {candidates}）：用 --instance 指定", file=sys.stderr)
+        return 2
+    identity = f"{instance}/{session}"
+    try:
+        path = upsert_human_summary(layout.root, identity_key=identity, text=args.text)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    text = normalize_summary_text(args.text)
+    if args.json:
+        print(json.dumps({"ok": True, "path": str(path), "identity_key": identity, "text": text}, ensure_ascii=False))
+    else:
+        print(f"已写入人工摘要 {path}")
+        print(f"  {identity}")
+        print(f"  {text}")
     return 0
 
 

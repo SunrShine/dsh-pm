@@ -2810,6 +2810,43 @@ def register_cli(subparsers) -> None:
     _add_common(transition)
     transition.set_defaults(handler=command_transition)
 
+    dispatch = task_sub.add_parser(
+        "dispatch",
+        help="准备 handoff 并把任务迁到 DOING（只准备，不启动任何执行；dispatchStatus 仍只两种）",
+    )
+    dispatch.add_argument("task_id", metavar="TASK_ID")
+    dispatch.add_argument("--project", required=True, metavar="KEY")
+    _add_write_flags(dispatch)
+    _add_common(dispatch)
+    dispatch.set_defaults(handler=command_dispatch)
+
+    submit_review = task_sub.add_parser(
+        "submit-review", help="AI/人提交验收：DOING → REVIEW（不写 DONE）",
+    )
+    submit_review.add_argument("task_id", metavar="TASK_ID")
+    submit_review.add_argument("--project", required=True, metavar="KEY")
+    _add_write_flags(submit_review)
+    _add_common(submit_review)
+    submit_review.set_defaults(handler=command_submit_review)
+
+    accept = task_sub.add_parser(
+        "accept", help="人工验收：REVIEW → DONE（只允许 actor=human）",
+    )
+    accept.add_argument("task_id", metavar="TASK_ID")
+    accept.add_argument("--project", required=True, metavar="KEY")
+    _add_write_flags(accept)
+    _add_common(accept)
+    accept.set_defaults(handler=command_accept)
+
+    returned = task_sub.add_parser(
+        "return", help="人工退回：REVIEW → DOING（必须给 --reason）",
+    )
+    returned.add_argument("task_id", metavar="TASK_ID")
+    returned.add_argument("--project", required=True, metavar="KEY")
+    _add_write_flags(returned)
+    _add_common(returned)
+    returned.set_defaults(handler=command_return)
+
     check = task_sub.add_parser("check", help="勾选/取消验收标准（CAS + 审计）")
     check.add_argument("task_id", metavar="TASK_ID")
     check.add_argument("--project", required=True, metavar="KEY")
@@ -3180,6 +3217,108 @@ def command_transition(args) -> int:
     print(prefix + "已迁移 " + result.entity_id + "  " + result.previous_status + " → " + result.status
           + "  rev " + str(result.previous_revision) + " → " + str(result.revision) + "  audit " + str(result.audit_event_id))
     return 0
+
+
+def _task_transition_command(
+    args,
+    *,
+    to_status: str,
+    actor: str,
+    default_reason: str,
+    extra: dict | None = None,
+):
+    """dispatch/submit-review/accept/return 共用：transition + 统一 JSON 形状。"""
+    json_mode = bool(getattr(args, "json", False))
+    layout, gate_error = _write_layout(args, json_mode)
+    if layout is None:
+        return _emit_error(json_mode, TaskOpError(gate_error[0], gate_error[1], exit_code=gate_error[2]))
+    path = tasks_path(layout, args.project)
+    try:
+        result = transition_task(
+            path,
+            args.task_id,
+            to_status=to_status,
+            expected_revision=args.expected_revision,
+            actor=actor,
+            reason=(args.reason or default_reason),
+            idempotency_key=args.idempotency_key,
+            dry_run=args.dry_run,
+        )
+    except entities.EntityError as exc:
+        return _emit_error(json_mode, exc)
+    payload = _write_payload(result, layout, dry_run=args.dry_run, extra=extra)
+    if json_mode:
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+    prefix = "[dry-run] " if args.dry_run else ""
+    if not result.changed:
+        print(prefix + "无需变更：" + result.entity_id + " 已是 " + result.status + " rev " + str(result.revision))
+        return 0
+    print(prefix + "已迁移 " + result.entity_id + "  " + result.previous_status + " → " + result.status
+          + "  rev " + str(result.previous_revision) + " → " + str(result.revision)
+          + "  audit " + str(result.audit_event_id))
+    return 0
+
+
+def command_dispatch(args) -> int:
+    """A 诚实版：只校验 HANDOFF_READY、迁移 DOING、输出 handoff；绝不声称已启动。"""
+    from pm import execution
+
+    json_mode = bool(getattr(args, "json", False))
+    layout, gate_error = _write_layout(args, json_mode)
+    if layout is None:
+        return _emit_error(json_mode, TaskOpError(gate_error[0], gate_error[1], exit_code=gate_error[2]))
+    try:
+        info = execution.handoff(layout, args.task_id)
+    except entities.EntityError as exc:
+        return _emit_error(json_mode, exc)
+    if info.get("dispatchStatus") != execution.DISPATCH_HANDOFF_READY:
+        return _emit_error(json_mode, TaskOpError(
+            "DISPATCH_NOT_READY",
+            "执行配置未就绪（需要 workspace 与 session；先 pm task execution-config set / link-session）",
+        ))
+    return _task_transition_command(
+        args,
+        to_status=STATUS_DOING,
+        actor=args.actor,
+        default_reason="准备 handoff（不启动执行）",
+        extra={"dispatchStatus": info.get("dispatchStatus"), "handoff": info.get("handoff")},
+    )
+
+
+def command_submit_review(args) -> int:
+    return _task_transition_command(
+        args,
+        to_status=STATUS_REVIEW,
+        actor=args.actor,
+        default_reason="提交验收",
+    )
+
+
+def command_accept(args) -> int:
+    if args.actor != "human":
+        return _emit_error(bool(getattr(args, "json", False)), TaskOpError(
+            "DONE_REQUIRES_HUMAN", "accept 只允许 actor=human；AI/系统提交请用 submit-review",
+        ))
+    return _task_transition_command(
+        args,
+        to_status=STATUS_DONE,
+        actor="human",
+        default_reason="人工验收通过",
+    )
+
+
+def command_return(args) -> int:
+    if not str(args.reason or "").strip():
+        return _emit_error(bool(getattr(args, "json", False)), TaskOpError(
+            "REASON_REQUIRED", "return 必须给 --reason（说明退回原因）",
+        ))
+    return _task_transition_command(
+        args,
+        to_status=STATUS_DOING,
+        actor="human",
+        default_reason="人工退回",
+    )
 
 
 def command_check(args) -> int:

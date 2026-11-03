@@ -2,6 +2,57 @@
 
 本项目遵循 Keep a Changelog 的写法；版本号在第一次正式发布前不承诺语义化兼容。
 
+## [0.3.3] - 2026-11-03
+
+本版主题：**AI 协作闭环 + PM 右栏工作流收口**。把「任务动作 / 摘要 / 提案修订」从只读展示推进到可执行，
+并把右侧栏 PM 工作台在窄面板下的布局、详情、随手记与跳转体验收口。
+
+### Added
+- **任务动作闭环（P2-1 诚实版）**：CLI `pm task dispatch / submit-review / accept / return` 与
+  `POST /ui-pm/tasks/:id/{dispatch,submit-review,accept,return}`。
+  `dispatch` 只产出 `HANDOFF_READY` 并按状态机迁到 `DOING`，**不启动任何执行**；
+  `accept` 只允许 `actor=human`（DONE 仍由人写）；`return` 必须给 `--reason`。
+- **AI 工作卡摘要闭环**：工作卡显示会话名与摘要入口；人工摘要对话框；按需让会话自己总结（≤50 字）；
+  批量补齐摘要 + 来源时间 / 路径映射 / 项目身份稳定化。
+- **MCP `proposal_revise`**：AI 与用户对话后修订 PENDING 提案的 `risks` / `actions` / `changes`；
+  保留提案 ID，plan revision +1，只写 `proposals.org`，不创建任务、不派发、不改源 inbox。
+  提案详情新增「复制 AI 修改指令」，带 proposal ID / revision / 当前风险与待确认事项。
+- **提案历史**：工作台「需要我处理」新增可折叠「已处理提案」，可回看 `APPROVED` / `REJECTED` 详情。
+- **右栏 PM 工作台（配套 UI）**：紧凑布局下把 PM 导航收成图标条、详情改为右侧抽屉；
+  随手记输入框加宽（右栏约 3.5 倍宽）、详情抽屉支持拖拽/键盘调宽（双击复位）；
+  「今日下一步」项目卡整卡可点；置顶随手记「处理」会选中并滚动到对应条目。
+- **UI 回归 peer**：新增 `scripts/ui_e2e_smoke.mjs`，真实浏览器多视口只读检查
+  布局溢出、全部 nav 跳转、收件箱详情打开/关闭、今日下一步整卡跳转、JS/HTTP 错误。
+
+### Changed
+- `pm proposal list` 改为一次读取全部提案；工作台仅把 `PENDING` 放进待批准列表，
+  `APPROVED` / `REJECTED` 进历史；提案行状态徽章按真实 `status` 显示。
+- 提案 `create / approve / revise` 统一按 `:ID:` 在多文件 inbox 真源中定位条目，
+  不再只读生成的 `inbox.org` 汇总视图。
+- 窄面板详情宽度上限改为 `92vw`（原来 `vw-610` 在右栏里把上限压到 320，几乎不可调）。
+- 窄面板下详情打开为固定右侧抽屉，关闭恢复全宽，不再把详情排到页面下方。
+
+### Fixed
+- **`PROPOSAL_SOURCE_NOT_FOUND`**：多文件 inbox 后提案批准/修订找不到源条目，
+  改为按 `:ID:` 定位 `inbox-human-*.org` / `inbox-ai-*.org`。
+- 置顶随手记点「处理」只到收件箱页面顶端 → 现在自动清掉隐藏它的筛选并滚动到选中行。
+- 半屏/窄栏点「处理这条」看不到展开页 → 详情抽屉固定在视口内。
+- 右栏详情拖拽范围被压成 320px → 窄视口按 92vw 计算上限，可正常调宽。
+
+### Tests
+- `tests.test_mcp` **17 OK**（含 `proposal_revise` 成功 / CAS 过期拒绝 / tools/list 广告）；
+- `tests.test_proposals` **93 OK**（含多文件 inbox 下 create / approve 回归）；
+- `tests/frontend` **93 pass**；i18n quick **全绿**；
+- `scripts/ui_e2e_smoke.mjs` 在 1600 / 1200 / 1000 三档 **30 项全过、0 页面异常**。
+
+### Known limitations
+- **0.3.3 已于 2026-11-03 发布**（tag `v0.3.3`，GitHub public release）；
+- DSH 侧「右栏 PM 自动打开 + 单 iframe」属于 **DSH ui-pm 插件**（另一个 checkout），
+  不计入本包版本；需要在 DSH 侧重启后生效；
+- MCP `proposal_revise` 需要重启 / 新开 DSH 会话后才会出现在 AI 工具表；
+- 任务板仍有 32 条 `REVIEW` 等人工验收；README 的 Roadmap 段和 `内部记录/` 尚未按本版同步
+  （`内部记录/` 改动需要用户授权）。
+
 ## [0.3.2] - 2026-10-23
 
 本版主题：**多文件 inbox**（人工按周 / AI 按月轮转，`inbox.org` 变生成视图）+ UI 来源筛选 + Emacs 集成 + 文档同步。

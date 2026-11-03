@@ -141,14 +141,14 @@ class MultiFileRenderTest(unittest.TestCase):
             modes = inbox_files.InboxModes(human="weekly", ai="monthly")
             capture_text(root, "人工 A", source="cli", model="cli", now=NOW, inbox_modes=modes)
             capture_text(root, "AI B", source="mcp", model="deepseek", now=NOW, inbox_modes=modes)
-            result = inbox_files.render(root, modes)
+            result = inbox_files.render(root, modes, now=NOW)
             self.assertTrue(result["written"])
             text = (root / "inbox.org").read_text(encoding="utf-8")
             self.assertIn("人工 A", text)
             self.assertIn("AI B", text)
             self.assertIn(inbox_files.GENERATED_MARKER, text)
             self.assertNotIn("[[file:inbox.org][inbox.org]]", text, "生成视图不得把自己列进历史")
-            self.assertFalse(inbox_files.render(root, modes, check=True)["changed"])
+            self.assertFalse(inbox_files.render(root, modes, check=True, now=NOW)["changed"])
 
     def test_render_is_skipped_in_single_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

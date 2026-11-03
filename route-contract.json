@@ -59,28 +59,7 @@
       "reason": "not a request parameter"
     }
   ],
-  "unsupported": [
-    {
-      "method": "POST",
-      "path": "/ui-pm/tasks/:id/submit-review",
-      "reason": "pm task submit-review is not part of the CLI yet (P3 acceptance flow)"
-    },
-    {
-      "method": "POST",
-      "path": "/ui-pm/tasks/:id/accept",
-      "reason": "pm task accept is not part of the CLI yet (P3 acceptance flow)"
-    },
-    {
-      "method": "POST",
-      "path": "/ui-pm/tasks/:id/return",
-      "reason": "pm task return is not part of the CLI yet (P3 acceptance flow)"
-    },
-    {
-      "method": "POST",
-      "path": "/ui-pm/tasks/:id/dispatch",
-      "reason": "this service never dispatches work: execution-config plus handoff is the whole contract, and no endpoint may claim a run started"
-    }
-  ],
+  "unsupported": [],
   "unexposedCommands": [
     {
       "cliPath": [
@@ -129,6 +108,27 @@
         "skill"
       ],
       "reason": "skill installation and path maintenance, run by a person or by pm skill install"
+    },
+    {
+      "cliPath": [
+        "inbox",
+        "files"
+      ],
+      "reason": "listing the multi-file inbox sources is a maintenance view; the workbench reads the aggregate list"
+    },
+    {
+      "cliPath": [
+        "inbox",
+        "migrate"
+      ],
+      "reason": "splitting a legacy inbox.org is a one-off, human-approved maintenance write"
+    },
+    {
+      "cliPath": [
+        "inbox",
+        "render"
+      ],
+      "reason": "rebuilding the generated inbox.org view is maintenance; the workbench edits through the domain routes"
     },
     {
       "cliPath": [
@@ -289,6 +289,11 @@
           "name": "status",
           "kind": "query",
           "required": false
+        },
+        {
+          "name": "origin",
+          "kind": "query",
+          "required": false
         }
       ],
       "body": [],
@@ -300,6 +305,7 @@
           ],
           "argvFlags": [
             "--status",
+            "--origin",
             "--json"
           ]
         }
@@ -884,6 +890,54 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/ui-pm/cards/:session/summary",
+      "write": true,
+      "revision": "none",
+      "patterns": {
+        "session": "^session-[0-9a-f-]{36}$"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "summary",
+          "flag": "--text",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "instance",
+          "flag": "--instance",
+          "kind": "string",
+          "required": true
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "summary",
+            "set-human"
+          ],
+          "argvFlags": [
+            "--session",
+            "--instance",
+            "--text",
+            "--json"
+          ]
+        }
+      ],
+      "shared": [],
+      "notForwarded": [
+        {
+          "flag": "--root",
+          "reason": "the work-memory root comes from the plugin configuration, not from the request"
+        }
+      ],
+      "notes": [
+        "人工摘要写入 overrides.org；不覆盖 AI 摘要，也不把 AI 摘要冒充人工摘要"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/ui-pm/tasks",
       "write": false,
@@ -910,6 +964,194 @@
           "argvFlags": [
             "--project",
             "--status",
+            "--json"
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/dispatch",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "expectedRevision",
+          "flag": "--expected-revision",
+          "kind": "int",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "flag": "--reason",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "dispatch"
+          ],
+          "argvFlags": [
+            "--project",
+            "--expected-revision",
+            "--reason",
+            "--json"
+          ]
+        }
+      ],
+      "notes": [
+        "准备 handoff 并把任务迁到 DOING；响应里的 dispatchStatus 仍是 HANDOFF_READY，绝无“已启动”"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/submit-review",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "expectedRevision",
+          "flag": "--expected-revision",
+          "kind": "int",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "flag": "--reason",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "submit-review"
+          ],
+          "argvFlags": [
+            "--project",
+            "--expected-revision",
+            "--reason",
+            "--json"
+          ]
+        }
+      ],
+      "notes": [
+        "只把 DOING 迁到 REVIEW；DONE 仍只能由人类 accept 写入"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/accept",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "expectedRevision",
+          "flag": "--expected-revision",
+          "kind": "int",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "flag": "--reason",
+          "kind": "string",
+          "required": false
+        }
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "accept"
+          ],
+          "argvFlags": [
+            "--project",
+            "--expected-revision",
+            "--reason",
+            "--json"
+          ]
+        }
+      ],
+      "notes": [
+        "人工验收：REVIEW -> DONE；命令对非 human actor 直接拒绝（DONE_REQUIRES_HUMAN）"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/ui-pm/tasks/:id/return",
+      "write": true,
+      "revision": "required",
+      "ids": {
+        "id": "task"
+      },
+      "query": [],
+      "body": [
+        {
+          "name": "project",
+          "flag": "--project",
+          "kind": "string",
+          "required": true
+        },
+        {
+          "name": "expectedRevision",
+          "flag": "--expected-revision",
+          "kind": "int",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "flag": "--reason",
+          "kind": "string",
+          "required": true
+        }
+      ],
+      "required": [
+        "reason"
+      ],
+      "commands": [
+        {
+          "cliPath": [
+            "task",
+            "return"
+          ],
+          "argvFlags": [
+            "--project",
+            "--expected-revision",
+            "--reason",
             "--json"
           ]
         }

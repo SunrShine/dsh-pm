@@ -57,6 +57,8 @@ CARD_KEYS = {
     "observation_label",
     "summary",
     "summary_source",
+    "summary_generated_at",
+    "summary_generated_by",
     "turns",
     "steps",
     "recorded_at",

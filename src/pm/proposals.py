@@ -195,6 +195,20 @@ def _read_text(path: Path, *, what: str) -> str:
         raise _wrap(exc) from exc
 
 
+def _locate_inbox_file(layout, source_inbox_id: str) -> Path:
+    """多文件 inbox：按 :ID: 找到条目所在的真实文件（而不是只读生成视图 inbox.org）。"""
+    from pm import inbox_files
+
+    try:
+        payload = inbox_files.read_entries(layout.root)
+    except Exception:  # pragma: no cover - 聚合失败时退回旧路径，让原有错误如实上报
+        return layout.inbox
+    for entry in payload.get("entries") or []:
+        if str(entry.get("id") or "") == source_inbox_id and entry.get("file"):
+            return Path(layout.root) / str(entry["file"])
+    return layout.inbox
+
+
 def _find_block(text: str, entity_id: str, *, headline: str | None, default_status: str) -> dict:
     """在 org 文本里按 :ID: 找块；找不到区分 LEGACY_UNTRACKED / NOT_FOUND。"""
     blocks = entities.iter_entity_blocks(text, headline=headline)
@@ -649,9 +663,10 @@ def create_proposal(
         if replay is not None:
             # 重放时把可能没落地的 inbox 步骤补上，否则两文件事务永远收敛不了。
             return _complete_replay_inbox(
-                replay, inbox_file=inbox_file, actor=actor, idempotency_key=key, now=now
+                replay, layout=layout, inbox_file=inbox_file, actor=actor, idempotency_key=key, now=now
             )
 
+    inbox_file = _locate_inbox_file(layout, source_inbox_id)
     inbox_text = _read_text(inbox_file, what="inbox")
     inbox_block = _find_block(inbox_text, source_inbox_id, headline=INBOX_SECTION, default_status="CAPTURED")
     if inbox_block["drawer"] is None:
@@ -823,7 +838,7 @@ def create_proposal(
                 "auditEventId": inbox_op.audit_event_id,
             },
         ],
-        extra={"projectHint": hint, "written": [PROPOSALS_RELATIVE, INBOX_RELATIVE], "notWritten": []},
+        extra={"projectHint": hint, "written": [PROPOSALS_RELATIVE, str(inbox_file.relative_to(layout.root))], "notWritten": []},
     )
 
 
@@ -1121,6 +1136,7 @@ def _key_audit(text: str, block: dict, idempotency_key: str) -> tuple[str | None
 def _complete_replay_inbox(
     replay: ProposalResult,
     *,
+    layout,
     inbox_file: Path,
     actor: str,
     idempotency_key: str,
@@ -1132,7 +1148,10 @@ def _complete_replay_inbox(
     - 已是本提案标的 TASK_PROPOSED → 原样返回（幂等）；
     - 否则补一次 CAS；失败按 PARTIAL_WRITE 如实报告。
     """
-    if replay.status != STATUS_PENDING or not replay.source_inbox_id or not inbox_file.is_file():
+    if replay.status != STATUS_PENDING or not replay.source_inbox_id:
+        return replace(replay, partial=False)
+    inbox_file = _locate_inbox_file(layout, replay.source_inbox_id)
+    if not inbox_file.is_file():
         return replace(replay, partial=False)
     try:
         block = _find_block(
@@ -1390,7 +1409,6 @@ def revise(
     now = now or datetime.now().astimezone()
     layout = as_layout(library_root)
     proposals_file = layout.proposals_file
-    inbox_file = layout.inbox
     text = _read_text(proposals_file, what="提案")
     item = _find_proposal_item(text, proposal_id)
 
@@ -1418,6 +1436,7 @@ def revise(
         raise ProposalError(
             "PROPOSAL_NO_SOURCE", f"{proposal_id} 没有 :PM_SOURCE_INBOX_ID:，无法重挂源 revision"
         )
+    inbox_file = _locate_inbox_file(layout, source_inbox_id)
     inbox_text = _read_text(inbox_file, what="inbox")
     try:
         inbox_block = _find_block(
@@ -1427,7 +1446,7 @@ def revise(
         if exc.code in ("NOT_FOUND", "LEGACY_UNTRACKED"):
             raise ProposalError(
                 "PROPOSAL_SOURCE_NOT_FOUND",
-                f"提案的源 Inbox {source_inbox_id} 不在 inbox.org 里（{exc.code}）；无法重挂 revision。",
+                f"提案的源 Inbox {source_inbox_id} 不在任何 inbox 真源文件里（{exc.code}）；无法重挂 revision。",
             ) from exc
         raise
     inbox_status = _block_status(inbox_block, "CAPTURED")
@@ -1612,7 +1631,6 @@ def approve(
     now = now or datetime.now().astimezone()
     layout = as_layout(library_root)
     proposals_file = layout.proposals_file
-    inbox_file = layout.inbox
     proposals_text = _read_text(proposals_file, what="提案")
 
     if idempotency_key:
@@ -1622,8 +1640,9 @@ def approve(
         if replay is not None:
             return replay
 
-    inbox_text = _read_text(inbox_file, what="inbox")
     item = _find_proposal_item(proposals_text, proposal_id)
+    inbox_file = _locate_inbox_file(layout, item["source_inbox_id"]) if item["source_inbox_id"] else layout.inbox
+    inbox_text = _read_text(inbox_file, what="inbox")
 
     inbox_block = None
     if item["source_inbox_id"]:

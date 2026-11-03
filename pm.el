@@ -9,7 +9,7 @@
 ;;   (load "/path/to/pm_tools/pm.el")
 ;;
 ;; Windows 上的 Emacs 读不到 WSL 的 /home 路径，要用 UNC：
-;;   \\wsl.localhost\Ubuntu\home\rui\projects\tools_dev\pm_tools\sandbox\work-memory
+;;   \\wsl.localhost\<distro>\home\<user>\<path-to-pm>\sandbox\work-memory
 ;;
 ;; 注意：agenda 只挂人工文件。generated/ 是机器生成物，没有 TODO，
 ;; 挂进去只会拖慢 agenda 而且毫无产出。

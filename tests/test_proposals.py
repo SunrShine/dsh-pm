@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from pm import cli, entities, proposals
+from pm import cli, entities, inbox_files, proposals
 from pm.layout import Layout
 from pm.mcp import capture_text
 
@@ -210,6 +210,38 @@ class ProposalFlowTest(unittest.TestCase):
         return [block for block in path.read_text(encoding="utf-8").split("** ") if block.strip()] if path.is_file() else []
 
     # ---- create ----
+
+    def test_approve_resolves_source_in_multi_file_inbox(self) -> None:
+        """批准也必须按 :ID: 找真源文件，而不是只读的 inbox.org 汇总视图。"""
+        modes = inbox_files.InboxModes(human="weekly", ai="monthly")
+        captured = capture_text(self.library, "多文件来源批准", source="cli", model="test",
+                                now=NOW, inbox_modes=modes)
+        tasks = self.make_project()
+        proposal = self.create(captured.inbox_id)
+        result = proposals.approve(self.library, proposal.entity_id, expected_revision=1,
+                                   project="proj-demo", now=NOW)
+        self.assertEqual(result.status, "APPROVED")
+        self.assertEqual(result.inbox_status, "TASK_CREATED")
+        text = captured.path.read_text(encoding="utf-8")
+        self.assertIn("TASK_CREATED", text)
+        tasks_text = tasks.read_text(encoding="utf-8")
+        for task_id in proposal.task_ids:
+            self.assertIn(task_id, tasks_text)
+
+    def test_create_resolves_source_in_multi_file_inbox(self) -> None:
+        """多文件 inbox 后，proposal 必须按 :ID: 找到真源文件，而不是只读的 inbox.org 汇总视图。"""
+        modes = inbox_files.InboxModes(human="weekly", ai="monthly")
+        captured = capture_text(self.library, "多文件来源提案", source="cli", model="test",
+                                now=NOW, inbox_modes=modes)
+        result = self.create(captured.inbox_id)
+        self.assertEqual(result.source_inbox_id, captured.inbox_id)
+        self.assertTrue(captured.path.is_file())
+        text = captured.path.read_text(encoding="utf-8")
+        self.assertIn("TASK_PROPOSED", text)
+        self.assertIn("inbox-", text)
+        # 汇总视图不是真源，不能被当成写入目标
+        if self.layout.inbox.exists():
+            self.assertNotIn(captured.inbox_id, self.layout.inbox.read_text(encoding="utf-8"))
 
     def test_create_writes_only_proposals_org_and_never_touches_tasks(self) -> None:
         inbox_id = self.seed_inbox()
