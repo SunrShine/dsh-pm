@@ -1,0 +1,151 @@
+/* 本文件由 scripts/build_page_css.py 从 内部记录/25-初始系统提示词.示例.html 的 <style> **机械生成** —— 请勿手改。
+   要改样式：改示例（或改本脚本的转换规则）⇒ 重新生成 ⇒ 跑 python3 scripts/verify_prompt_page_css_sync.py（逐字节比对）。
+   转换规则：:root/body/html ⇒ #pmPromptPage；* ⇒ #pmPromptPage, #pmPromptPage *；其余选择器逐个加前缀 #pmPromptPage ；@media 内同样处理。 */
+#pmMemoryPage /* 条目行里的来源行：示例原本只定义了 .dhead .src；为避免宿主通用 .src（等宽/小字）抢样式，这里显式写全 ✓。*/
+.entry .top .src {font-family:inherit;font-size:inherit;line-height:inherit;color:inherit;padding:0;background:transparent;margin-left:auto;border-radius:0}
+#pmMemoryPage {
+  --font-sans:'Fira Sans',system-ui,-apple-system,'Segoe UI','Noto Sans CJK SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'Fira Code',ui-monospace,SFMono-Regular,Menlo,Consolas,'Noto Sans Mono CJK SC',monospace;
+  --fs-xs:12px; --fs-sm:14px; --fs-base:16px; --fs-lg:18px; --fs-xl:24px; --fs-2xl:32px;
+  --lh-body:1.6; --lh-tight:1.35;
+  --bg:#191c22; --panel:#1e2229; --panel-2:#22262e; --sidebar:#141720;
+  --line:#2b313b; --line-2:#333a46; --text:#e6e9ef; --muted:#9aa3b2; --dim:#8b95a5;
+  --accent:#6b8afd; --accent-2:#7d9bff; --warn:#e0b46a; --ok:#5fd3a0; --danger:#e8937f;
+  --chip-blue-bg:#313a63; --chip-blue-bd:#5b7fd4;
+  --chip-gray-bg:#252a33; --chip-gray-bd:#39404c;
+  --chip-green-bg:#1e3a30; --chip-green-bd:#3f7a5f;
+  --field-bd:#666f82;   /* 必要边界专用（WCAG 1.4.11 ≥3:1；与 内部记录/25 同值）*/
+  --code-bg:#15181e;
+  --type-fact:#7fb2ff; --type-decision:#b79cff; --type-gotcha:#ffb37f;}
+[data-theme="light"] #pmMemoryPage {
+  --bg:#f5f7fb; --panel:#fff; --panel-2:#f8fafc; --sidebar:#eef1f7;
+  --line:#e2e7f0; --line-2:#cfd7e5; --text:#172033; --muted:#5f6b7d; --dim:#616d7e;
+  --accent:#397cf0; --accent-2:#2f6fe0; --warn:#9a5c08; --ok:#14724b; --danger:#a63b22;
+  --chip-blue-bg:#dfe6ff; --chip-blue-bd:#7f9dff;
+  --chip-gray-bg:#eef1f6; --chip-gray-bd:#ccd4e2;
+  --chip-green-bg:#ddf3e8; --chip-green-bd:#72c39d;
+  --code-bg:#f6f8fa;
+  --field-bd:#6b7488;   /* light 同比加深 */
+  --type-fact:#1f5bb5; --type-decision:#5b3fb0; --type-gotcha:#8a4b12;}
+#pmMemoryPage, #pmMemoryPage * {box-sizing:border-box}
+#pmMemoryPage {margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);
+  font-size:var(--fs-base);line-height:var(--lh-body);-webkit-font-smoothing:antialiased}
+#pmMemoryPage .app {display:grid;grid-template-columns:264px minmax(0,1fr);min-height:100vh}
+#pmMemoryPage .sidebar {background:var(--sidebar);border-right:1px solid var(--line);padding:20px 12px 24px}
+#pmMemoryPage .brand {font-size:var(--fs-xl);font-weight:600;margin:0 0 2px 8px}
+#pmMemoryPage .brand span {color:var(--accent)}
+#pmMemoryPage .ver {font-size:var(--fs-xs);color:var(--dim);margin:0 0 18px 9px;font-family:var(--font-mono)}
+#pmMemoryPage .grp {font-size:var(--fs-xs);color:var(--dim);letter-spacing:.1em;text-transform:uppercase;
+  margin:20px 0 8px 12px;font-family:var(--font-mono)}
+#pmMemoryPage .nav a {display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--muted);
+  text-decoration:none;font-size:var(--fs-sm);line-height:var(--lh-tight);margin-bottom:2px;min-height:38px}
+#pmMemoryPage .nav a:hover {background:var(--panel-2);color:var(--text)}
+#pmMemoryPage .nav a.on {background:var(--panel-2);color:var(--text);box-shadow:inset 3px 0 0 var(--accent)}
+#pmMemoryPage .nav svg {width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round}
+#pmMemoryPage .tag {margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);
+  font-family:var(--font-mono);color:var(--ok);border:1px solid currentColor;border-radius:999px;padding:1px 9px}
+#pmMemoryPage .tag .dot {width:7px;height:7px;border-radius:50%;background:var(--ok)}
+#pmMemoryPage .main {padding:28px 34px 72px;min-width:0}
+#pmMemoryPage h1 {font-size:var(--fs-2xl);line-height:var(--lh-tight);font-weight:600;margin:0 0 8px;letter-spacing:-.3px}
+#pmMemoryPage .hint {color:var(--muted);font-size:var(--fs-sm);margin:0 0 18px;max-width:88ch}
+#pmMemoryPage .stats {display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:var(--fs-sm);color:var(--muted);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 0;margin-bottom:20px}
+#pmMemoryPage .stats b {color:var(--text);font-family:var(--font-mono);font-weight:600;font-size:var(--fs-base)}
+#pmMemoryPage .stats .grow {flex:1}
+#pmMemoryPage button, #pmMemoryPage select, #pmMemoryPage input {font-family:inherit;font-size:var(--fs-sm);color:inherit}
+#pmMemoryPage .btn {background:transparent;border:1px solid transparent;border-radius:8px;padding:8px 13px;cursor:pointer;
+  color:var(--muted);min-height:38px}
+#pmMemoryPage .btn:hover {background:var(--panel-2);color:var(--text)}
+#pmMemoryPage .btn.bordered {border-color:var(--field-bd)}
+#pmMemoryPage .btn.primary {background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
+#pmMemoryPage .btn.primary:hover {background:var(--accent-2);color:#fff}
+#pmMemoryPage .btn.danger {color:var(--danger);border-color:var(--line-2)}
+#pmMemoryPage .btn.danger:hover {border-color:var(--danger);color:var(--danger)}
+#pmMemoryPage .btn[aria-pressed="true"] {background:var(--panel-2);color:var(--text);border-color:var(--line-2)}
+#pmMemoryPage :focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+#pmMemoryPage .filters {display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px}
+#pmMemoryPage .filters input[type=search] {background:var(--panel-2);border:1px solid var(--line-2);border-radius:8px;
+  padding:8px 12px;min-width:240px;min-height:38px}
+#pmMemoryPage .split {display:block}
+#pmMemoryPage /* 左侧块列表已移除：scope 只用顶部下拉 */
+/* 说明：左侧「记忆块」列表已移除（与顶部下拉重复），以下 .blocks 样式保留但当前未使用 */
+.blocks {background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+#pmMemoryPage .blocks h2 {font-size:var(--fs-xs);color:var(--dim);font-family:var(--font-mono);letter-spacing:.06em;
+  text-transform:uppercase;margin:0;padding:14px 16px 10px}
+#pmMemoryPage .blk {display:block;width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--line);
+  padding:13px 16px;cursor:pointer;color:inherit;line-height:normal}
+#pmMemoryPage .blk:hover {background:var(--panel-2)}
+#pmMemoryPage .blk.on {background:var(--panel-2);box-shadow:inset 3px 0 0 var(--accent)}
+#pmMemoryPage .blk .name {font-size:var(--fs-sm);font-weight:600;display:flex;align-items:center;gap:8px}
+#pmMemoryPage .blk .id {font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--dim);margin-top:3px}
+#pmMemoryPage .blk .counts {display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+#pmMemoryPage .pill {font-family:var(--font-mono);font-size:var(--fs-xs);border:1px solid var(--line-2);
+  border-radius:999px;padding:1px 8px;color:var(--muted);line-height:normal}
+#pmMemoryPage .pill.cand {border-color:var(--chip-blue-bd);color:var(--chip-blue-bd)}
+#pmMemoryPage .pill.ver {color:var(--text)}
+#pmMemoryPage .pill.dep {border-style:dashed}
+#pmMemoryPage /* 右：详情 */
+.detail {background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+#pmMemoryPage .dhead {padding:14px 18px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+#pmMemoryPage .dhead .t {font-size:var(--fs-lg);font-weight:600}
+#pmMemoryPage .dhead .src {font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--dim);margin-left:auto}
+#pmMemoryPage .tabs {display:flex;gap:6px;padding:12px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center;  margin:0;}
+#pmMemoryPage .tab {background:transparent;border:1px solid transparent;border-radius:8px;padding:7px 12px;cursor:pointer;
+  color:var(--muted);font-size:var(--fs-sm);font-family:var(--font-mono)}
+#pmMemoryPage .tab:hover {background:var(--panel-2);color:var(--text)}
+#pmMemoryPage .tab[aria-selected="true"] {background:var(--panel-2);color:var(--text);border-color:var(--line-2)}
+#pmMemoryPage .tab .n {color:var(--dim)}
+#pmMemoryPage .entries {padding:12px;display:flex;flex-direction:column;gap:10px}
+#pmMemoryPage .entry {position:relative;border:1.5px solid var(--line-2);border-radius:12px;background:var(--panel);
+  padding:16px 18px;cursor:pointer;transition:border-color .16s ease, box-shadow .16s ease, transform .16s ease}
+#pmMemoryPage .entry:hover {border-color:var(--muted)}
+#pmMemoryPage .entry:hover {background:rgba(255,255,255,.025)}
+#pmMemoryPage .entry.sel {background:var(--panel-2);border-color:var(--accent);
+  box-shadow:inset 3px 0 0 var(--accent), 0 0 0 3px var(--chip-blue-bg)}
+#pmMemoryPage /* 取代链悬停 → 高亮目标卡片：必须比默认实边框更醒目（描边 + 外环 + 抬升） */
+.entry.linked {border-color:var(--accent);box-shadow:0 0 0 3px var(--chip-blue-bg), 0 10px 24px #0004;
+  transform:translateY(-1px)}
+#pmMemoryPage .entry.flash {animation:mem-flash 1.4s ease-out}
+@keyframes mem-flash {0%{box-shadow:0 0 0 4px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion: reduce) {#pmMemoryPage .entry {transition:none}
+#pmMemoryPage .entry.linked {transform:none}
+#pmMemoryPage .entry.flash {animation:none;box-shadow:0 0 0 3px var(--accent)}}
+#pmMemoryPage .entry.sel .txt {color:var(--text)}
+#pmMemoryPage .entry:last-child {border-bottom:none}
+#pmMemoryPage .entry .top {display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:8px}
+#pmMemoryPage .tbadge {font-family:var(--font-mono);font-size:var(--fs-xs);font-weight:500;border-radius:6px;
+  padding:2px 8px;border:1px solid currentColor}
+#pmMemoryPage .tbadge.fact {color:var(--type-fact)}
+#pmMemoryPage .tbadge.decision {color:var(--type-decision)}
+#pmMemoryPage .tbadge.gotcha {color:var(--type-gotcha)}
+#pmMemoryPage .sbadge {font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--line-2);
+  border-radius:999px;padding:1px 9px}
+#pmMemoryPage .sbadge.dep {border-style:dashed}
+#pmMemoryPage .unsourced {font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--warn);border:1px dashed currentColor;
+  border-radius:6px;padding:1px 7px}
+#pmMemoryPage .entry .txt {font-size:var(--fs-sm);color:var(--text);max-width:96ch;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#pmMemoryPage .entry.open .txt {-webkit-line-clamp:unset;display:block}
+#pmMemoryPage .entry .meta {font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--dim);margin-top:9px;line-height:1.7}
+#pmMemoryPage .entry .acts {display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+#pmMemoryPage .entry .acts .why {font-size:var(--fs-xs);color:var(--dim);font-family:var(--font-mono)}
+#pmMemoryPage .links {display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#pmMemoryPage .mem-link {display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:3px;cursor:pointer;
+  font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--line-2)}
+#pmMemoryPage .mem-link:hover {border-color:var(--accent);color:var(--accent)}
+#pmMemoryPage .mem-link.missing {opacity:.6;border-style:dashed;cursor:not-allowed}
+#pmMemoryPage .chain {margin-top:10px;font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--muted);
+  background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+#pmMemoryPage .empty {padding:34px 18px;text-align:center;color:var(--dim);font-size:var(--fs-sm)}
+#pmMemoryPage .empty b {display:block;color:var(--muted);font-size:var(--fs-base);margin-bottom:6px;font-weight:600}
+#pmMemoryPage .note {margin-top:22px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:10px;padding:14px 16px;color:var(--muted);font-size:var(--fs-sm)}
+#pmMemoryPage .note b {color:var(--text)}
+#pmMemoryPage .toast {position:fixed;right:24px;bottom:24px;background:var(--panel-2);border:1px solid var(--line-2);
+  border-radius:10px;padding:13px 16px;font-size:var(--fs-sm);max-width:440px;box-shadow:0 8px 24px #0006;display:none}
+#pmMemoryPage .toast.on {display:block}
+#pmMemoryPage .toast code {font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text)}
+@media (max-width:1000px) {#pmMemoryPage .app {grid-template-columns:1fr}
+#pmMemoryPage .sidebar {display:none}
+#pmMemoryPage .split {grid-template-columns:1fr}}

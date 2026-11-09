@@ -1,0 +1,1 @@
+{"version":3,"file":"locales.js","sourceRoot":"","sources":["../../../src/client/locales.ts"],"names":[],"mappings":"AAAA,sEAAsE;AAEtE,MAAM,CAAC,MAAM,EAAE,GAAG;IAChB,aAAa,EAAE,QAAQ;IACvB,mBAAmB,EAAE,qBAAqB;CACV,CAAA;AAIlC,MAAM,CAAC,MAAM,EAAE,GAAG;IAChB,aAAa,EAAE,cAAc;IAC7B,mBAAmB,EAAE,gEAAgE;CACrD,CAAA"}

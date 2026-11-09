@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+.venv/
+
+
+# 本机运行产物 / 编辑器 / 环境
+.local/
+*.log
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+config/pm.local.toml
+config/*.local.toml
+*.token
+
+# 构建缓存（注意：lib/ 是插件包的预构建产物，**要提交**，这里不忽略）
+*.tsbuildinfo

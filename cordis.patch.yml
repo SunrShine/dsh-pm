@@ -1,0 +1,17 @@
+# dsh-pm 的 bundle patch：安装后由 bundle 自己提供插件行与 MCP 行。
+# 迁移提示：装本包之前，请先把 profile 的 cordis.patch.yml 里手插的
+#   mcp-pm / ui-pm 两行删掉，否则会与这里重复。
+- insert:
+    - id: mcp-pm
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: pm
+        transport: stdio
+        # D5：按 PATH 发现 pm（不再写绝对路径）。
+        # 若 pm 不在 PATH：显式写绝对路径，或在 profile 里覆盖 env.PATH。
+        command: pm
+        args: ['mcp']
+        toolCallTimeoutMs: 180000
+- insert:
+    - id: dsh-pm
+      name: dsh-pm

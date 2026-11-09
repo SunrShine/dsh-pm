@@ -1,0 +1,52 @@
+# pm 工具配置
+#
+# 查找顺序：--config > $PM_CONFIG > ./pm.toml > 仓库自带 config/pm.toml
+
+# ── work-memory 库 ────────────────────────────────────────────────
+# scan / summary queue 靠它读取已生成的摘要；不配就会和 render 的结果矛盾。
+# TOML 要求：顶层键必须在所有 [[table]] 之前。
+library = "~/work-memory"  # 改成你自己的库根
+
+# ── 数据根（可以有多个）───────────────────────────────────────────
+# 每台机器上可能同时存在多个 DSH 数据根，各自有独立的工作区注册表与
+# session id 空间。session id 只在实例内唯一，所以身份键是 (id, session_id)。
+#
+# role 只影响用途标注：work = 常用工作目录；explore = 工具探索目录。
+
+[[instance]]
+id   = "default"
+path = "~/.dsh"
+role = "work"
+
+[[instance]]
+id   = "preview"
+path = "~/.dsh-preview"
+role = "explore"
+
+[[instance]]
+id   = "learn"
+path = "~/.dsh-learn"
+role = "explore"
+
+# ── 视图参数 ──────────────────────────────────────────────────────
+
+active_days  = 14
+active_hours = 24
+
+# 每个项目默认最多显示几行（噪声预算）；0 = 不限制
+row_limit = 8
+
+# 不当作项目的工作区路径（例如家目录工作区）
+exclude_paths = ["~/"]
+
+# 始终显示的工作卡（写 session-<uuid> 或 <uuid> 都行）
+pins = []
+
+# ── 合并规则 ──────────────────────────────────────────────────────
+# 一个项目可以由多个 DSH 工作区构成。
+
+[[merge]]
+key   = "demo"
+title = "演示项目"
+paths = [
+]

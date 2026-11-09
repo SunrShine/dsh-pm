@@ -1,0 +1,15 @@
+# -*- mode: snippet -*-
+# name: pm INBOX entry（人工）
+# key: inbox
+# condition: (string-match-p "inbox-human-.*\\.org\\|inbox\\.org" (buffer-file-name))
+# --
+** INBOX ${1:一句话标题}
+   :PROPERTIES:
+   :ID: ${2:inbox-manual-`(format-time-string "%Y%m%d-%H%M%S")`}
+   :PM_KIND: inbox
+   :PM_STATUS: CAPTURED
+   :PM_SOURCE: manual
+   :PM_ADDED_BY: human
+   :PM_CAPTURED_AT: `(format-time-string "%Y-%m-%dT%H:%M:%S%:z")`
+   :END:
+   $0
